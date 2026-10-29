@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Monitor</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- 1. Шапка застосунку -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <h1 class="brand-title">System Monitor</h1>
+      </div>
+      <div class="header-status">
+        <div id="collectorStatusBadge" class="status-badge">
+          <span class="status-dot"></span>
+          <span id="collectorStatusText">Збір даних активний</span>
+        </div>
+        <div id="localTimeDisplay" class="current-time">--:--:--</div>
+      </div>
+    </header>
+
+    <!-- 2. Ряд із 4 плиток поточних показників -->
+    <section class="tiles-grid">
+      <!-- Плитка 1: CPU -->
+      <div class="tile-card" id="tileCpu">
+        <div class="tile-header">
+          <span class="tile-title">Процесор</span>
+          <span class="tile-subinfo" id="cpuCoresCount">-- ядер</span>
+        </div>
+        <div class="tile-body">
+          <div class="tile-value-group">
+            <span class="tile-value" id="cpuTotalVal">--%</span>
+            <span class="tile-caption">Загальне завантаження</span>
+          </div>
+          <div class="tile-sparkline-wrap">
+            <canvas id="sparklineCpu" class="sparkline-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Плитка 2: RAM -->
+      <div class="tile-card" id="tileRam">
+        <div class="tile-header">
+          <span class="tile-title">Оперативна пам'ять</span>
+          <span class="tile-subinfo" id="ramTotalInfo">-- ГБ</span>
+        </div>
+        <div class="tile-body">
+          <div class="tile-value-group">
+            <span class="tile-value" id="ramPercentVal">--%</span>
+            <span class="tile-caption" id="ramUsedCaption">-- / -- ГБ</span>
+          </div>
+          <div class="tile-sparkline-wrap">
+            <canvas id="sparklineRam" class="sparkline-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Плитка 3: Диск C: -->
+      <div class="tile-card" id="tileDisk">
+        <div class="tile-header">
+          <span class="tile-title">Системний диск C:</span>
+          <span class="tile-subinfo" id="diskTotalInfo">-- ГБ</span>
+        </div>
+        <div class="tile-body">
+          <div class="tile-value-group">
+            <span class="tile-value" id="diskPercentVal">--%</span>
+            <span class="tile-caption" id="diskFreeCaption">Вільно: -- ГБ</span>
+          </div>
+          <div class="tile-sparkline-wrap">
+            <canvas id="sparklineDisk" class="sparkline-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Плитка 4: Мережа -->
+      <div class="tile-card" id="tileNet">
+        <div class="tile-header">
+          <span class="tile-title">Мережа</span>
+          <span class="tile-subinfo">Активність I/O</span>
+        </div>
+        <div class="tile-body">
+          <div class="tile-value-group">
+            <span class="tile-value" id="netRecvVal" style="font-size: 24px;">↓ 0 КБ/с</span>
+            <span class="tile-caption" id="netSentVal">↑ 0 КБ/с</span>
+          </div>
+          <div class="tile-sparkline-wrap">
+            <canvas id="sparklineNet" class="sparkline-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Великий графік навантаження CPU та RAM -->
+    <section class="chart-section">
+      <div class="chart-header">
+        <div class="chart-title-group">
+          <h2 class="chart-title">Динаміка навантаження</h2>
+          <div class="chart-legend">
+            <div class="legend-item">
+              <span class="legend-bullet bullet-cpu"></span>
+              <span>CPU</span>
+            </div>
+            <div class="legend-item" id="peakCpuLegend" style="display: none;">
+              <span class="legend-bullet bullet-cpu-peak"></span>
+              <span>Пік CPU (max)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-bullet bullet-ram"></span>
+              <span>RAM</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Перемикач періодів -->
+        <div class="chart-tabs">
+          <button class="tab-btn active" data-range="live" id="tabLive">Наживо</button>
+          <button class="tab-btn" data-range="hour" id="tabHour">Година</button>
+          <button class="tab-btn" data-range="day" id="tabDay">День</button>
+        </div>
+      </div>
+
+      <div class="chart-canvas-container" id="chartContainer">
+        <canvas id="mainTelemetryChart"></canvas>
+        <div id="chartTooltip" class="chart-tooltip">
+          <div class="tt-time" id="ttTime">--:--:--</div>
+          <div class="tt-row">
+            <span style="color: var(--accent-blue);">CPU:</span>
+            <strong id="ttCpu">--%</strong>
+          </div>
+          <div class="tt-row" id="ttCpuPeakRow" style="display: none;">
+            <span style="color: rgba(76, 141, 255, 0.7);">Пік CPU:</span>
+            <strong id="ttCpuPeak">--%</strong>
+          </div>
+          <div class="tt-row">
+            <span style="color: var(--accent-purple);">RAM:</span>
+            <strong id="ttRam">--%</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Нижня сітка: Ядра процесора та Топ процесів -->
+    <section class="bottom-grid">
+      <!-- Ядра процесора -->
+      <div class="cores-card">
+        <div class="cores-header">
+          <h3 class="cores-title">Ядра процесора</h3>
+          <span class="cores-count" id="coresHeaderCount">--</span>
+        </div>
+        <div class="cores-bars-grid" id="coresGrid">
+          <div class="empty-state">Завантаження ядер...</div>
+        </div>
+      </div>
+
+      <!-- Таблиця процесів -->
+      <div class="processes-card">
+        <div class="processes-header">
+          <h3 class="processes-title">Топ процесів</h3>
+          <div class="processes-sort-controls">
+            <span>Сортування:</span>
+            <button class="sort-btn active" data-sort="cpu" id="sortCpuBtn">CPU %</button>
+            <button class="sort-btn" data-sort="ram" id="sortRamBtn">RAM %</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="proc-table">
+            <thead>
+              <tr>
+                <th style="width: 35%;">Назва процесу</th>
+                <th style="width: 15%;">PID</th>
+                <th style="width: 25%;">CPU %</th>
+                <th style="width: 12%;">RAM %</th>
+                <th style="width: 13%;">Пам'ять</th>
+              </tr>
+            </thead>
+            <tbody id="processesTableBody">
+              <tr>
+                <td colspan="5">
+                  <div class="empty-state">Отримання списку процесів...</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Підключення скриптів дашборду -->
+  <script src="/static/js/chart.js"></script>
+  <script src="/static/js/tabs.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

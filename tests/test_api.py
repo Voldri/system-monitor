@@ -1,5 +1,5 @@
 """
-Тести базових маршрутів Flask API.
+Тести базових маршрутів Flask API та віддачі дашборду.
 """
 
 import tempfile
@@ -11,7 +11,7 @@ from app.db.connection import init_db
 from app.server import create_app
 
 class TestServerAPI(unittest.TestCase):
-    """Перевірка відповідей базових ендпоінтів Flask API."""
+    """Перевірка відповідей Flask API та статичних файлів дашборду."""
 
     def setUp(self):
         self.temp_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
@@ -38,42 +38,75 @@ class TestServerAPI(unittest.TestCase):
                 except Exception:
                     pass
 
+    def test_index_serves_html(self):
+        """GET / повертає 200 та HTML-документ дашборду."""
+        with self.client.get("/") as res:
+            self.assertEqual(res.status_code, 200)
+            self.assertIn("text/html", res.content_type)
+            html = res.get_data(as_text=True)
+            self.assertIn("System Monitor", html)
+            self.assertIn("mainTelemetryChart", html)
+            self.assertIn("tabLive", html)
+
+    def test_static_files_served(self):
+        """Перевірка віддачі файлів CSS та JS зі статичного каталогу."""
+        # CSS
+        with self.client.get("/static/css/style.css") as res_css:
+            self.assertEqual(res_css.status_code, 200)
+            self.assertIn("text/css", res_css.content_type)
+            self.assertIn("--bg-primary", res_css.get_data(as_text=True))
+
+        # JS chart
+        with self.client.get("/static/js/chart.js") as res_chart:
+            self.assertEqual(res_chart.status_code, 200)
+            self.assertIn("TelemetryChart", res_chart.get_data(as_text=True))
+
+        # JS app
+        with self.client.get("/static/js/app.js") as res_app:
+            self.assertEqual(res_app.status_code, 200)
+            self.assertIn("fetchCurrentMetrics", res_app.get_data(as_text=True))
+
+        # JS tabs
+        with self.client.get("/static/js/tabs.js") as res_tabs:
+            self.assertEqual(res_tabs.status_code, 200)
+            self.assertIn("TabsController", res_tabs.get_data(as_text=True))
+
     def test_status_endpoint(self):
         """GET /api/status повертає 200, статус ok та логічні ядра."""
-        res = self.client.get("/api/status")
-        self.assertEqual(res.status_code, 200)
-        data = res.get_json()
-        self.assertEqual(data["status"], "ok")
-        self.assertIn("logical_cores", data)
-        self.assertGreater(data["logical_cores"], 0)
+        with self.client.get("/api/status") as res:
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertEqual(data["status"], "ok")
+            self.assertIn("logical_cores", data)
+            self.assertGreater(data["logical_cores"], 0)
 
     def test_current_metrics_endpoint(self):
         """GET /api/metrics/current містить локальний час та показники."""
-        res = self.client.get("/api/metrics/current")
-        self.assertEqual(res.status_code, 200)
-        data = res.get_json()
-        self.assertIn("cpu_total", data)
-        self.assertIn("local_time", data)
-        self.assertIn("ram_percent", data)
+        with self.client.get("/api/metrics/current") as res:
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertIn("cpu_total", data)
+            self.assertIn("local_time", data)
+            self.assertIn("ram_percent", data)
 
     def test_history_metrics_endpoint(self):
         """GET /api/metrics/history повертає часовий ряд."""
-        res = self.client.get("/api/metrics/history?range=live")
-        self.assertEqual(res.status_code, 200)
-        data = res.get_json()
-        self.assertEqual(data["range"], "live")
-        self.assertGreaterEqual(data["count"], 1)
+        with self.client.get("/api/metrics/history?range=live") as res:
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertEqual(data["range"], "live")
+            self.assertGreaterEqual(data["count"], 1)
 
     def test_processes_endpoint(self):
         """GET /api/processes повертає список процесів без PID 0."""
-        res = self.client.get("/api/processes?sort=cpu&limit=10")
-        self.assertEqual(res.status_code, 200)
-        data = res.get_json()
-        self.assertEqual(data["sort_by"], "cpu")
-        procs = data["processes"]
-        self.assertIsInstance(procs, list)
-        for p in procs:
-            self.assertNotEqual(p["pid"], 0)
+        with self.client.get("/api/processes?sort=cpu&limit=10") as res:
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertEqual(data["sort_by"], "cpu")
+            procs = data["processes"]
+            self.assertIsInstance(procs, list)
+            for p in procs:
+                self.assertNotEqual(p["pid"], 0)
 
 if __name__ == "__main__":
     unittest.main()
