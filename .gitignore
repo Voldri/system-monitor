@@ -1,0 +1,28 @@
+# Python virtual environment
+.venv/
+venv/
+ENV/
+
+# Environment secrets
+.env
+
+# SQLite databases
+*.db
+*.db-wal
+*.db-shm
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+
+# PyInstaller / Build outputs
+build/
+dist/
+*.spec.bak
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
