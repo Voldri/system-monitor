@@ -111,7 +111,7 @@ def generate_excel_report(
 
     # 6. Аркуш: «Поради ШІ»
     ws_ai = wb.create_sheet(title="Поради ШІ")
-    _fill_ai_sheet(ws_ai)
+    _fill_ai_sheet(ws_ai, target_db)
 
     output = io.BytesIO()
     wb.save(output)
@@ -316,50 +316,77 @@ def _fill_metrics_sheet(ws, period: str, db_path: Path) -> None:
             rows = cur.fetchall()
 
     curr_row = 2
-    for r in rows:
-        ts_str = format_local_time(r["bucket_ts"])
-        cpu_avg = r["cpu_avg"] or 0.0
-        cpu_peak = r["cpu_max_val"] or cpu_avg
-        ram_avg = r["ram_avg"] or 0.0
-        ram_peak = r["ram_max_val"] or ram_avg
-        gpu_avg = r["gpu_avg"]
-        gpu_peak = r["gpu_max_val"]
-        gpu_temp = r["gpu_temp_avg"]
-
-        row_vals = [ts_str, cpu_avg, cpu_peak, ram_avg, ram_peak, gpu_avg, gpu_peak, gpu_temp]
-
-        for col_idx, val in enumerate(row_vals, 1):
-            cell = ws.cell(row=curr_row, column=col_idx, value=val)
-            cell.font = FONT_REGULAR
-            cell.border = BORDER_THIN
-            cell.alignment = Alignment(horizontal="center" if col_idx == 1 else "right")
-
-            # Умовне форматування: значення > 90% підсвічуються червоним
-            if isinstance(val, (int, float)) and col_idx in (2, 3, 4, 5, 6, 7):
-                if val >= 90.0:
-                    cell.fill = FILL_ALERT_RED
-                    cell.font = FONT_ALERT_RED
-
+    if not rows:
+        cell = ws.cell(row=curr_row, column=1, value="Немає даних за період")
+        cell.font = FONT_REGULAR
         curr_row += 1
+    else:
+        for r in rows:
+            ts_str = format_local_time(r["bucket_ts"])
+            cpu_avg = r["cpu_avg"] or 0.0
+            cpu_peak = r["cpu_max_val"] or cpu_avg
+            ram_avg = r["ram_avg"] or 0.0
+            ram_peak = r["ram_max_val"] or ram_avg
+            gpu_avg = r["gpu_avg"]
+            gpu_peak = r["gpu_max_val"]
+            gpu_temp = r["gpu_temp_avg"]
+
+            row_vals = [ts_str, cpu_avg, cpu_peak, ram_avg, ram_peak, gpu_avg, gpu_peak, gpu_temp]
+
+            for col_idx, val in enumerate(row_vals, 1):
+                cell = ws.cell(row=curr_row, column=col_idx, value=val)
+                cell.font = FONT_REGULAR
+                cell.border = BORDER_THIN
+                cell.alignment = Alignment(horizontal="center" if col_idx == 1 else "right")
+
+                # Умовне форматування: значення > 90% підсвічуються червоним
+                if isinstance(val, (int, float)) and col_idx in (2, 3, 4, 5, 6, 7):
+                    if val >= 90.0:
+                        cell.fill = FILL_ALERT_RED
+                        cell.font = FONT_ALERT_RED
+
+            curr_row += 1
 
     last_data_row = curr_row - 1
 
     # Додавання лінійної діаграми Excel
-    if last_data_row >= 3:
+    if rows and len(rows) >= 2:
         chart = LineChart()
         chart.title = "Телеметрія системи: CPU, RAM та GPU"
         chart.style = 13
         chart.y_axis.title = "Відсоток (%)"
+        chart.x_axis.title = "Час"
         chart.x_axis.number_format = "yyyy-mm-dd hh:mm:ss"
-        chart.width = 20
+        chart.width = 28
         chart.height = 12
 
-        # Стовпці 2 (CPU), 4 (RAM), 6 (GPU)
-        data = Reference(ws, min_col=2, min_row=1, max_col=6, max_row=min(last_data_row, 300))
+        # Стовпці 2..7: CPU Сер./Пік, RAM Сер./Пік, GPU Сер./Пік
+        data = Reference(ws, min_col=2, min_row=1, max_col=7, max_row=min(last_data_row, 300))
         cats = Reference(ws, min_col=1, min_row=2, max_row=min(last_data_row, 300))
         chart.add_data(data, titles_from_data=True)
         chart.set_categories(cats)
-        ws.add_chart(chart, "J2")
+
+        # Фірмові кольори ліній: CPU - 4C8DFF, RAM - A78BFA, GPU - F0883E
+        series_styles = [
+            ("4C8DFF", 19050, None),    # CPU Сер. (синій, 1.5 pt)
+            ("4C8DFF", 12700, "dash"),  # CPU Пік (синій пунктир, тонкий)
+            ("A78BFA", 19050, None),    # RAM Сер. (фіолетовий, 1.5 pt)
+            ("A78BFA", 12700, "dash"),  # RAM Пік (фіолетовий пунктир, тонкий)
+            ("F0883E", 19050, None),    # GPU Сер. (помаранчевий, 1.5 pt)
+            ("F0883E", 12700, "dash"),  # GPU Пік (помаранчевий пунктир, тонкий)
+        ]
+
+        for idx, s in enumerate(chart.series):
+            s.smooth = False
+            if idx < len(series_styles):
+                color, width_emu, dash = series_styles[idx]
+                s.graphicalProperties.line.solidFill = color
+                s.graphicalProperties.line.width = width_emu
+                if dash:
+                    s.graphicalProperties.line.prstDash = dash
+
+        chart.legend.position = "b"
+        ws.add_chart(chart, "K2")
 
     _auto_fit_columns(ws, len(headers), 25)
 
@@ -456,8 +483,8 @@ def _fill_alerts_sheet(ws, period: str, db_path: Path) -> None:
 
     _auto_fit_columns(ws, len(headers), 50)
 
-def _fill_ai_sheet(ws) -> None:
-    """Заповнення аркуша 'Поради ШІ' (поки лише заголовки колонок)."""
+def _fill_ai_sheet(ws, db_path: Optional[Path] = None) -> None:
+    """Заповнення аркуша 'Поради ШІ' історією порад та чату з бази даних."""
     ws.views.sheetView[0].showGridLines = True
     headers = [
         "ID", "Час запиту", "Режим", "Джерело",
@@ -466,4 +493,45 @@ def _fill_ai_sheet(ws) -> None:
     for col_idx, h in enumerate(headers, 1):
         ws.cell(row=1, column=col_idx, value=h)
     _style_header_row(ws, 1, len(headers))
-    _auto_fit_columns(ws, len(headers), 35)
+
+    target_db = db_path or DB_PATH
+    records = []
+    try:
+        with db_session(target_db) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, timestamp, mode, source, user_query, metrics_summary, advice_text, status
+                FROM ai_advice
+                ORDER BY timestamp DESC
+                LIMIT 100
+            """)
+            records = cur.fetchall()
+    except Exception as e:
+        logger.warning(f"Не вдалося зчитати історію ai_advice для звіту: {e}")
+
+    curr_row = 2
+    for r in records:
+        time_str = format_local_time(r["timestamp"])
+        vals = [
+            r["id"],
+            time_str,
+            r["mode"],
+            r["source"],
+            r["user_query"] or "--",
+            r["metrics_summary"] or "--",
+            r["advice_text"],
+            r["status"],
+        ]
+        for col_idx, val in enumerate(vals, 1):
+            cell = ws.cell(row=curr_row, column=col_idx, value=val)
+            cell.font = FONT_REGULAR
+            cell.border = BORDER_THIN
+            if col_idx in (1, 3, 4, 8):
+                cell.alignment = Alignment(horizontal="center")
+            elif col_idx in (5, 6, 7):
+                cell.alignment = Alignment(horizontal="left", wrap_text=True)
+            else:
+                cell.alignment = Alignment(horizontal="center")
+        curr_row += 1
+
+    _auto_fit_columns(ws, len(headers), 45)

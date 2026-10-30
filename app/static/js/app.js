@@ -105,6 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
       fetchAlerts();
     } else if (viewName === 'specs') {
       fetchSpecs();
+    } else if (viewName === 'ai') {
+      fetchAiStatus();
     } else if (viewName === 'monitoring') {
       chart.resize();
       chart.render();
@@ -987,7 +989,275 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =========================================================================
-  // 16. ГОЛОВНІ ТАЙМЕРИ ОПИТУВАННЯ
+  // 17. ШІ-ПОРАДНИК (AI Advisor & Chat)
+  // =========================================================================
+  let currentAiPeriod = '24h';
+  let chatHistory = []; // До 6 останніх реплік
+
+  function renderSafeMarkdown(text) {
+    if (!text) return '';
+    // 1. Екранування HTML-символів проти XSS
+    let safe = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+    // 2. Жирний текст: **текст**
+    safe = safe.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // 3. Курсив: *текст*
+    safe = safe.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+    // 4. Вбудований код: `код`
+    safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // 5. Ненумеровані списки: - пункт або * пункт
+    safe = safe.replace(/^\s*[-*]\s+(.*)$/gm, '<li>$1</li>');
+
+    // 6. Нумеровані списки: 1. пункт
+    safe = safe.replace(/^\s*(\d+)\.\s+(.*)$/gm, '<li value="$1">$2</li>');
+
+    // 7. Переноси рядків у <br>
+    safe = safe.replace(/\n/g, '<br>');
+
+    return safe;
+  }
+
+  async function fetchAiStatus() {
+    try {
+      const res = await fetch('/api/ai/status');
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const badge = document.getElementById('aiKeyStatusBadge');
+      const dot = document.getElementById('aiKeyStatusDot');
+      const text = document.getElementById('aiKeyStatusText');
+
+      if (badge && dot && text) {
+        if (data.has_key) {
+          dot.style.background = 'var(--status-green)';
+          dot.style.boxShadow = '0 0 8px var(--status-green)';
+          text.textContent = 'Gemini API: Налаштовано';
+        } else {
+          dot.style.background = 'var(--status-yellow)';
+          dot.style.boxShadow = '0 0 8px var(--status-yellow)';
+          text.textContent = 'Gemini API: Не налаштовано (Автономний режим)';
+        }
+      }
+    } catch (e) {
+      console.warn('Не вдалося отримати /api/ai/status:', e);
+    }
+  }
+
+  // Перемикання періоду для автопоради
+  const aiPeriodButtons = document.querySelectorAll('.ai-period-btn');
+  aiPeriodButtons.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      aiPeriodButtons.forEach((b) => b.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      currentAiPeriod = e.currentTarget.getAttribute('data-ai-period') || '24h';
+    });
+  });
+
+  // Кнопка "Отримати пораду"
+  const btnGetAiAdvice = document.getElementById('btnGetAiAdvice');
+  const aiAdviceSpinner = document.getElementById('aiAdviceBtnSpinner');
+  const aiAdviceContent = document.getElementById('aiAdviceContent');
+  const aiAdviceMeta = document.getElementById('aiAdviceMeta');
+  const aiAdviceSourceBadge = document.getElementById('aiAdviceSourceBadge');
+  const aiAdviceTimestamp = document.getElementById('aiAdviceTimestamp');
+
+  if (btnGetAiAdvice) {
+    btnGetAiAdvice.addEventListener('click', async () => {
+      if (btnGetAiAdvice.disabled) return;
+      btnGetAiAdvice.disabled = true;
+      if (aiAdviceSpinner) aiAdviceSpinner.style.display = 'inline-block';
+      if (aiAdviceContent) {
+        aiAdviceContent.innerHTML = '<div class="empty-state">🤖 ШІ аналізує телеметрію та формує рекомендації...</div>';
+      }
+
+      try {
+        const res = await fetch('/api/ai/advise', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ period: currentAiPeriod }),
+        });
+        if (!res.ok) throw new Error(`HTTP помилка ${res.status}`);
+        const data = await res.json();
+
+        if (aiAdviceContent) {
+          aiAdviceContent.innerHTML = renderSafeMarkdown(data.advice);
+        }
+        if (aiAdviceMeta) aiAdviceMeta.style.display = 'flex';
+        if (aiAdviceSourceBadge) {
+          aiAdviceSourceBadge.textContent = data.source;
+          if (data.status === 'fallback' || data.source === 'Автономний режим') {
+            aiAdviceSourceBadge.classList.add('fallback');
+          } else {
+            aiAdviceSourceBadge.classList.remove('fallback');
+          }
+        }
+        if (aiAdviceTimestamp) {
+          aiAdviceTimestamp.textContent = new Date(data.timestamp * 1000).toLocaleTimeString();
+        }
+      } catch (err) {
+        console.error('Помилка отримання автопоради ШІ:', err);
+        if (aiAdviceContent) {
+          aiAdviceContent.innerHTML = `<div class="empty-state" style="color: var(--status-red);">Помилка: ${err.message}</div>`;
+        }
+      } finally {
+        btnGetAiAdvice.disabled = false;
+        if (aiAdviceSpinner) aiAdviceSpinner.style.display = 'none';
+      }
+    });
+  }
+
+  // Інтерактивний чат
+  const chatMessagesContainer = document.getElementById('chatMessagesContainer');
+  const chatInputText = document.getElementById('chatInputText');
+  const btnSendChatMessage = document.getElementById('btnSendChatMessage');
+  const btnClearChat = document.getElementById('btnClearChat');
+  const chatCharCounter = document.getElementById('chatCharCounter');
+  const chatTypingIndicator = document.getElementById('chatTypingIndicator');
+
+  // Лічильник символів
+  if (chatInputText && chatCharCounter) {
+    chatInputText.addEventListener('input', () => {
+      const len = chatInputText.value.length;
+      chatCharCounter.textContent = `${len} / 500`;
+      if (len >= 500) {
+        chatCharCounter.className = 'char-counter limit-full';
+      } else if (len >= 450) {
+        chatCharCounter.className = 'char-counter limit-near';
+      } else {
+        chatCharCounter.className = 'char-counter';
+      }
+    });
+
+    // Відправка за Enter (без Shift)
+    chatInputText.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+  }
+
+  if (btnSendChatMessage) {
+    btnSendChatMessage.addEventListener('click', sendChatMessage);
+  }
+
+  if (btnClearChat) {
+    btnClearChat.addEventListener('click', () => {
+      chatHistory = [];
+      if (chatMessagesContainer) {
+        chatMessagesContainer.innerHTML = `
+          <div class="chat-message bot-message">
+            <div class="message-sender">
+              <span>🤖 ШІ-порадник</span>
+              <span class="source-tag">Система</span>
+            </div>
+            <div class="message-bubble">
+              Історію очищено. Запитайте мене про ресурси, процеси або способи оптимізації цього ПК.
+            </div>
+          </div>
+        `;
+      }
+    });
+  }
+
+  async function sendChatMessage() {
+    if (!chatInputText) return;
+    const msg = chatInputText.value.trim();
+    if (!msg) return;
+
+    if (msg.length > 500) {
+      alert('Повідомлення не може перевищувати 500 символів.');
+      return;
+    }
+
+    // 1. Додаємо бульбашку користувача
+    appendChatBubble('user', msg);
+    chatInputText.value = '';
+    if (chatCharCounter) {
+      chatCharCounter.textContent = '0 / 500';
+      chatCharCounter.className = 'char-counter';
+    }
+
+    // 2. Показуємо індикатор друкування
+    if (chatTypingIndicator) chatTypingIndicator.style.display = 'block';
+    if (chatMessagesContainer) chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: msg,
+          history: chatHistory,
+          period: currentAiPeriod,
+        }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      // Додаємо репліки в історію (до 6 останніх)
+      chatHistory.push({ role: 'user', text: msg });
+      chatHistory.push({ role: 'model', text: data.reply });
+      if (chatHistory.length > 6) {
+        chatHistory = chatHistory.slice(-6);
+      }
+
+      // 3. Додаємо відповідь бота
+      appendChatBubble('bot', data.reply, data.source);
+    } catch (err) {
+      appendChatBubble('bot', `⚠️ Помилка: ${err.message}`, 'Помилка');
+    } finally {
+      if (chatTypingIndicator) chatTypingIndicator.style.display = 'none';
+      if (chatMessagesContainer) chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+    }
+  }
+
+  function appendChatBubble(role, text, source = null) {
+    if (!chatMessagesContainer) return;
+    const msgEl = document.createElement('div');
+    msgEl.className = `chat-message ${role === 'user' ? 'user-message' : 'bot-message'}`;
+
+    let senderHtml = '';
+    if (role === 'user') {
+      senderHtml = `
+        <div class="message-sender">
+          <span>Ви</span>
+        </div>
+      `;
+    } else {
+      const isFallback = source === 'Автономний режим';
+      senderHtml = `
+        <div class="message-sender">
+          <span>🤖 ШІ-порадник</span>
+          ${source ? `<span class="source-tag ${isFallback ? 'fallback' : ''}">${source}</span>` : ''}
+        </div>
+      `;
+    }
+
+    msgEl.innerHTML = `
+      ${senderHtml}
+      <div class="message-bubble">${renderSafeMarkdown(text)}</div>
+    `;
+
+    chatMessagesContainer.appendChild(msgEl);
+    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+  }
+
+  // =========================================================================
+  // 18. ГОЛОВНІ ТАЙМЕРИ ОПИТУВАННЯ
   // =========================================================================
   // Первинний виклик усіх служб
   fetchStatus();
@@ -996,6 +1266,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchChartHistory('live');
   fetchAlerts();
   fetchSpecs();
+  fetchAiStatus();
 
   // Посекундне опитування поточних показників
   setInterval(fetchCurrentMetrics, 1000);

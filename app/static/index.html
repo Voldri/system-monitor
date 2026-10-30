@@ -48,6 +48,9 @@
       <button class="nav-tab-btn" data-view="analytics" id="navAnalytics">
         <span>📊 Аналітика</span>
       </button>
+      <button class="nav-tab-btn" data-view="ai" id="navAi">
+        <span>🤖 ШІ-порадник</span>
+      </button>
       <button class="nav-tab-btn" data-view="alerts" id="navAlerts">
         <span>🔔 Сповіщення</span>
         <span id="navAlertsCount" class="nav-count-badge" style="display: none;">0</span>
@@ -400,7 +403,113 @@
     </section>
 
     <!-- =================================================================== -->
-    <!-- РОЗДІЛ 3: СПОВІЩЕННЯ (Alerts)                                        -->
+    <!-- РОЗДІЛ 3: ШІ-ПОРАДНИК (AI Advisor)                                  -->
+    <!-- =================================================================== -->
+    <section id="viewAi" class="view-panel">
+      <div class="panel-header-controls">
+        <div class="panel-title-wrap">
+          <h2 class="panel-main-title">🤖 ШІ-порадник з оптимізації</h2>
+          <span class="panel-subtitle">Аналіз ресурсів комп'ютера, виявлення проблем та персональні рекомендації</span>
+        </div>
+        <div id="aiKeyStatusBadge" class="status-badge" title="Стан підключення до Gemini API">
+          <span id="aiKeyStatusDot" class="status-dot"></span>
+          <span id="aiKeyStatusText">Перевірка Gemini API...</span>
+        </div>
+      </div>
+
+      <div class="ai-main-grid">
+        <!-- Блок 1: Автопорада з оптимізації -->
+        <div class="card-fluent ai-advice-card">
+          <div class="ai-card-header">
+            <div>
+              <h3>Експертна оцінка системи</h3>
+              <p class="card-caption">Автоматичний аналіз навантаження та вузьких місць за обраний період</p>
+            </div>
+            <div class="ai-period-controls">
+              <div class="period-toggle-group">
+                <button class="period-btn ai-period-btn" data-ai-period="1h">1 год</button>
+                <button class="period-btn ai-period-btn active" data-ai-period="24h">24 год</button>
+                <button class="period-btn ai-period-btn" data-ai-period="7d">7 днів</button>
+              </div>
+              <button id="btnGetAiAdvice" class="btn-primary">
+                <span id="aiAdviceBtnSpinner" class="spinner-inline" style="display: none;"></span>
+                <span>✨ Отримати пораду</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Результат автопоради -->
+          <div class="ai-advice-result-wrap" id="aiAdviceResultWrap">
+            <div class="ai-advice-meta" id="aiAdviceMeta" style="display: none;">
+              <span id="aiAdviceSourceBadge" class="source-badge">Gemini</span>
+              <span id="aiAdviceTimestamp" class="ai-timestamp">--:--:--</span>
+            </div>
+            <div id="aiAdviceContent" class="ai-markdown-body">
+              <div class="empty-state">
+                Натисніть кнопку «Отримати пораду», щоб ШІ проаналізував продуктивність комп'ютера за обраний період.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Блок 2: Інтерактивний чат із ШІ -->
+        <div class="card-fluent ai-chat-card">
+          <div class="ai-card-header">
+            <div>
+              <h3>Чат із ШІ-інженером</h3>
+              <p class="card-caption">Запитуйте про ресурси, процеси та способи прискорення саме цього ПК</p>
+            </div>
+            <button id="btnClearChat" class="btn-secondary btn-sm" title="Очистити історію листування">Очистити чат</button>
+          </div>
+
+          <!-- Контейнер повідомлень -->
+          <div class="chat-messages-container" id="chatMessagesContainer">
+            <div class="chat-message bot-message">
+              <div class="message-sender">
+                <span>🤖 ШІ-порадник</span>
+                <span class="source-tag">Система</span>
+              </div>
+              <div class="message-bubble">
+                Вітаю! Я проаналізую ресурси, процеси та характеристики вашого ПК. Запитайте мене про стан процесора, пам'яті, дискового простору чи способи оптимізації.
+              </div>
+            </div>
+          </div>
+
+          <!-- Індикатор друкування ШІ -->
+          <div id="chatTypingIndicator" class="chat-typing" style="display: none;">
+            <div class="typing-bubble">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-text">ШІ аналізує систему...</span>
+            </div>
+          </div>
+
+          <!-- Форма введення -->
+          <div class="chat-input-wrap">
+            <div class="chat-input-row">
+              <textarea
+                id="chatInputText"
+                class="chat-textarea"
+                placeholder="Запитайте про процеси, пам'ять або оптимізацію цього ПК... (Enter — надіслати, Shift+Enter — новий рядок)"
+                maxlength="500"
+                rows="2"
+              ></textarea>
+              <button id="btnSendChatMessage" class="btn-primary btn-chat-send" title="Надіслати повідомлення">
+                <span>Надіслати</span>
+              </button>
+            </div>
+            <div class="chat-input-footer">
+              <span class="chat-hint">Максимум 500 символів • У контексті до 6 останніх реплік</span>
+              <span id="chatCharCounter" class="char-counter">0 / 500</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- РОЗДІЛ 4: СПОВІЩЕННЯ (Alerts)                                        -->
     <!-- =================================================================== -->
     <section id="viewAlerts" class="view-panel">
       <div class="panel-header-controls">

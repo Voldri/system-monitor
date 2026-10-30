@@ -88,6 +88,21 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_proc_usage_hourly_hour ON process_usage_hourly(hour)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_proc_usage_hourly_name ON process_usage_hourly(process_name)")
 
+    # Створення таблиці ai_advice, якщо її ще немає
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ai_advice (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            mode TEXT NOT NULL,
+            source TEXT NOT NULL,
+            user_query TEXT DEFAULT NULL,
+            metrics_summary TEXT NOT NULL,
+            advice_text TEXT NOT NULL,
+            status TEXT NOT NULL
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ai_advice_timestamp ON ai_advice(timestamp)")
+
     cursor.close()
 
 def init_db(db_path: Optional[Path] = None) -> None:

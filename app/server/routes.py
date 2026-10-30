@@ -336,3 +336,80 @@ def export_excel_endpoint():
         as_attachment=True,
         download_name=filename,
     )
+
+@api_bp.route("/ai/advise", methods=["POST"])
+def post_ai_advise():
+    """
+    Отримання автопоради ШІ:
+    - period: 1h | 24h | 7d (за замовчуванням 24h)
+    - force: boolean (скидання 5-хвилинного кешу)
+    """
+    from app.services.ai_advisor import get_auto_advice
+    req_json = request.get_json(silent=True) or {}
+    period = req_json.get("period") or request.args.get("period", "24h")
+    if period not in ("1h", "24h", "7d"):
+        period = "24h"
+    force = bool(req_json.get("force", False) or request.args.get("force", "false").lower() in ("true", "1"))
+
+    db_path = getattr(current_app, "db_path", None)
+    result = get_auto_advice(period=period, db_path=db_path, force=force)
+    return jsonify(result)
+
+@api_bp.route("/ai/chat", methods=["POST"])
+def post_ai_chat():
+    """
+    Діалог із ШІ-порадником:
+    - message: рядок <= 500 символів (інакше 400 Bad Request)
+    - history: список реплік (до 6 останніх)
+    - period: 1h | 24h | 7d (за замовчуванням 24h)
+    """
+    from app.services.ai_advisor import chat_with_advisor
+    req_json = request.get_json(silent=True) or {}
+    message = (req_json.get("message") or "").strip()
+    if not message:
+        return jsonify({"error": "Повідомлення не може бути порожнім"}), 400
+    if len(message) > 500:
+        return jsonify({"error": "Повідомлення не може перевищувати 500 символів"}), 400
+
+    history = req_json.get("history", [])
+    period = req_json.get("period", "24h")
+    if period not in ("1h", "24h", "7d"):
+        period = "24h"
+
+    db_path = getattr(current_app, "db_path", None)
+    try:
+        result = chat_with_advisor(message=message, history=history, period=period, db_path=db_path)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": "Не вдалося отримати відповідь ШІ"}), 500
+
+@api_bp.route("/ai/history", methods=["GET"])
+def get_ai_history_endpoint():
+    """Повертає історію порад та відповідей ШІ."""
+    from app.services.ai_advisor import get_ai_history
+    limit = min(max(int(request.args.get("limit", 50)), 1), 200)
+    db_path = getattr(current_app, "db_path", None)
+    history = get_ai_history(limit=limit, db_path=db_path)
+    return jsonify({
+        "count": len(history),
+        "history": history,
+    })
+
+@api_bp.route("/ai/status", methods=["GET"])
+def get_ai_status():
+    """
+    Повертає статус інтеграції ШІ:
+    - has_key: чи налаштовано GEMINI_API_KEY (без показу ключа)
+    - model: назва моделі
+    - send_process_names: стан надсилання назв процесів
+    """
+    from app import config
+    has_key = bool(config.GEMINI_API_KEY and config.GEMINI_API_KEY.strip())
+    return jsonify({
+        "has_key": has_key,
+        "model": config.GEMINI_MODEL,
+        "send_process_names": config.AI_SEND_PROCESS_NAMES,
+    })
+
