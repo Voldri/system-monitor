@@ -8,9 +8,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Optional
 
-from app.config import DB_PATH
+from app.config import BUNDLE_DIR, DB_PATH
 
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
+if not SCHEMA_PATH.is_file():
+    SCHEMA_PATH = BUNDLE_DIR / "app" / "db" / "schema.sql"
 
 def get_db_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     """

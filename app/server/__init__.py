@@ -9,13 +9,11 @@ from typing import Optional
 
 from flask import Flask, jsonify, send_from_directory
 
-from app.config import BASE_DIR, DB_PATH
+from app.config import DB_PATH, STATIC_DIR
 from app.server.routes import api_bp
 
 # Приглушення службових логів Werkzeug (рівень WARNING)
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
-
-STATIC_DIR = BASE_DIR / "app" / "static"
 
 def create_app(collector=None, db_path: Optional[Path] = None) -> Flask:
     """

@@ -3,11 +3,121 @@
 Містить простий вбудований завантажувач .env, системні пороги та параметри роботи.
 """
 
+import logging
+from logging.handlers import RotatingFileHandler
 import os
+import sys
 from pathlib import Path
 
-# Кореневий каталог проєкту
-BASE_DIR = Path(__file__).resolve().parent.parent
+
+def is_frozen() -> bool:
+    """Перевіряє, чи працює застосунок у скомпільованому PyInstaller (.exe) режимі."""
+    return getattr(sys, "frozen", False)
+
+
+def get_base_dir() -> Path:
+    """
+    Повертає базовий каталог для користувацьких файлів (.env, monitor.db, logs/):
+    - У режимі PyInstaller (.exe) — каталог поруч із виконуваним файлом sys.executable.
+    - У звичайному режимі розробки — корінь репозиторію.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+
+def get_bundle_dir() -> Path:
+    """
+    Повертає каталог із запакованими статичними ресурсами та кодом:
+    - У режимі PyInstaller — тимчасовий каталог розпакування sys._MEIPASS.
+    - У звичайному режимі розробки — корінь репозиторію.
+    """
+    if hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent.parent
+
+
+BASE_DIR = get_base_dir()
+BUNDLE_DIR = get_bundle_dir()
+
+# Статичні ресурси (шаблони, CSS, JS, іконки)
+STATIC_DIR = BUNDLE_DIR / "app" / "static"
+ASSETS_DIR = STATIC_DIR / "assets"
+ICON_PNG_PATH = ASSETS_DIR / "icon.png"
+ICON_ICO_PATH = ASSETS_DIR / "icon.ico"
+
+# Користувацькі файли поруч із .exe або в корені розробки
+DB_PATH = BASE_DIR / "monitor.db"
+ENV_PATH = BASE_DIR / ".env"
+LOGS_DIR = BASE_DIR / "logs"
+LOG_FILE = LOGS_DIR / "system-monitor.log"
+
+
+def ensure_icons_exist() -> None:
+    """Автоматично генерує іконки, якщо вони відсутні на диску."""
+    if not ICON_PNG_PATH.is_file() or not ICON_ICO_PATH.is_file():
+        try:
+            from tools.make_icon import generate_icons
+            generate_icons(ICON_PNG_PATH, ICON_ICO_PATH, BASE_DIR / "icon.ico")
+        except Exception:
+            pass
+
+
+# Перевіряємо та генеруємо іконки при завантаженні конфігурації
+ensure_icons_exist()
+
+
+def setup_logging(level: int = logging.INFO) -> None:
+    """
+    Налаштовує систему логування з ротацією у logs/system-monitor.log біля .exe
+    (максимум 5 МБ, 3 файли архіву, кодування UTF-8).
+    """
+    try:
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    # Файловий ротаційний лог
+    has_file_handler = any(isinstance(h, RotatingFileHandler) for h in root_logger.handlers)
+    if not has_file_handler:
+        try:
+            file_handler = RotatingFileHandler(
+                str(LOG_FILE),
+                maxBytes=5 * 1024 * 1024,
+                backupCount=3,
+                encoding="utf-8"
+            )
+            file_formatter = logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+            )
+            file_handler.setFormatter(file_formatter)
+            file_handler.setLevel(level)
+            root_logger.addHandler(file_handler)
+        except Exception as e:
+            print(f"[Попередження] Не вдалося налаштувати файловий лог: {e}")
+
+    # Консольний вивід (якщо консоль доступна)
+    has_console_handler = any(
+        isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler)
+        for h in root_logger.handlers
+    )
+    if not has_console_handler and sys.stdout is not None:
+        try:
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_formatter = logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+            )
+            console_handler.setFormatter(console_formatter)
+            console_handler.setLevel(level)
+            root_logger.addHandler(console_handler)
+        except Exception:
+            pass
+
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
 
 def load_dotenv(env_path: Path = None) -> None:
     """
@@ -15,7 +125,7 @@ def load_dotenv(env_path: Path = None) -> None:
     Зчитує пари KEY=VALUE, пропускаючи коментарі (#) та порожні рядки.
     """
     if env_path is None:
-        env_path = BASE_DIR / ".env"
+        env_path = get_base_dir() / ".env"
 
     if not env_path.is_file():
         return
@@ -38,11 +148,9 @@ def load_dotenv(env_path: Path = None) -> None:
     except Exception as e:
         print(f"[Попередження] Не вдалося завантажити .env: {e}")
 
+
 # Виконуємо завантаження при імпорті конфігурації
 load_dotenv()
-
-# База даних
-DB_PATH = BASE_DIR / "monitor.db"
 
 # Сервер
 HOST = os.getenv("HOST", "127.0.0.1")

@@ -41,6 +41,7 @@ class MetricCollector:
         self.db_path = db_path or DB_PATH
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
+        self._is_paused = False
 
         # Потоки воркерів
         self._system_thread: Optional[threading.Thread] = None
@@ -205,6 +206,28 @@ class MetricCollector:
         return self.get_threads_status()
 
     @property
+    def is_paused(self) -> bool:
+        """Повертає True, якщо збір метрик призупинено."""
+        return self._is_paused
+
+    def pause(self) -> None:
+        """Призупиняє збір телеметрії."""
+        self._is_paused = True
+        logger.info("MetricCollector: збір телеметрії призупинено.")
+
+    def resume(self) -> None:
+        """Відновлює збір телеметрії."""
+        self._is_paused = False
+        logger.info("MetricCollector: збір телеметрії відновлено.")
+
+    def toggle_pause(self) -> bool:
+        """Перемикає стан призупинення збору та повертає новий стан (True = призупинено)."""
+        self._is_paused = not self._is_paused
+        status_str = "призупинено" if self._is_paused else "відновлено"
+        logger.info(f"MetricCollector: збір телеметрії {status_str}.")
+        return self._is_paused
+
+    @property
     def _thread(self) -> Optional[threading.Thread]:
         """
         Сумісність зі старим кодом: повертає основний системний потік.
@@ -217,6 +240,11 @@ class MetricCollector:
     def _run_system_loop(self) -> None:
         """Цикл швидкого збору системних метрик строго кожну 1 секунду."""
         while not self._stop_event.is_set():
+            if self._is_paused:
+                if self._stop_event.wait(METRIC_INTERVAL_SEC):
+                    break
+                continue
+
             loop_start = time.time()
 
             try:
@@ -396,6 +424,9 @@ class MetricCollector:
             if self._stop_event.wait(PROCESS_INTERVAL_SEC):
                 break
 
+            if self._is_paused:
+                continue
+
             try:
                 procs = self._refresh_processes()
                 self._save_process_snapshots(procs)
@@ -510,7 +541,7 @@ class MetricCollector:
     def _run_gpu_loop(self) -> None:
         """Цикл збору телеметрії GPU кожні 2 с."""
         while not self._stop_event.is_set():
-            if self._gpu_available and self._gpu_handle:
+            if not self._is_paused and self._gpu_available and self._gpu_handle:
                 try:
                     import pynvml
                     util = pynvml.nvmlDeviceGetUtilizationRates(self._gpu_handle)
