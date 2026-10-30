@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Monitor</title>
+  <link rel="icon" type="image/png" href="/static/assets/icon.png">
+  <link rel="shortcut icon" href="/static/assets/icon.ico">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <!-- Контейнер спливаючих сповіщень (Toasts) -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <div class="app-container">
+    <!-- 1. Шапка застосунку -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <h1 class="brand-title">System Monitor</h1>
+      </div>
+
+      <div class="header-actions">
+        <!-- Індикатор активних тривог -->
+        <div id="activeAlertsBadge" class="alerts-badge" style="display: none;" title="Переглянути активні тривоги">
+          <span class="alerts-badge-icon">⚠️</span>
+          <span id="activeAlertsBadgeText">0 тривог</span>
+        </div>
+
+        <!-- Кнопка експорту в Excel -->
+        <button id="btnOpenExportModal" class="btn-action" title="Експортувати повний звіт у форматі Excel">
+          <span>📥 Експорт в Excel</span>
+        </button>
+
+        <!-- Статус збирача -->
+        <div id="collectorStatusBadge" class="status-badge">
+          <span class="status-dot"></span>
+          <span id="collectorStatusText">Збір активний</span>
+        </div>
+
+        <div id="localTimeDisplay" class="current-time">--:--:--</div>
+      </div>
+    </header>
+
+    <!-- Головна навігація по розділах дашборду -->
+    <nav class="main-nav">
+      <button class="nav-tab-btn active" data-view="monitoring" id="navMonitoring">
+        <span>⚡ Моніторинг</span>
+      </button>
+      <button class="nav-tab-btn" data-view="analytics" id="navAnalytics">
+        <span>📊 Аналітика</span>
+      </button>
+      <button class="nav-tab-btn" data-view="ai" id="navAi">
+        <span>🤖 ШІ-порадник</span>
+      </button>
+      <button class="nav-tab-btn" data-view="alerts" id="navAlerts">
+        <span>🔔 Сповіщення</span>
+        <span id="navAlertsCount" class="nav-count-badge" style="display: none;">0</span>
+      </button>
+      <button class="nav-tab-btn" data-view="specs" id="navSpecs">
+        <span>💻 Характеристики</span>
+      </button>
+    </nav>
+
+    <!-- =================================================================== -->
+    <!-- РОЗДІЛ 1: МОНІТОРИНГ (Головний дашборд)                              -->
+    <!-- =================================================================== -->
+    <main id="viewMonitoring" class="view-panel active">
+      <!-- 2. Ряд із 4 плиток: CPU, RAM, GPU, Мережа -->
+      <section class="tiles-grid">
+        <!-- Плитка 1: CPU -->
+        <div class="tile-card" id="tileCpu">
+          <div class="tile-header">
+            <span class="tile-title">Процесор</span>
+            <span class="tile-subinfo" id="cpuCoresCount">-- ядер</span>
+          </div>
+          <div class="tile-body">
+            <div class="tile-value-group">
+              <span class="tile-value" id="cpuTotalVal">--%</span>
+              <span class="tile-caption">Загальне завантаження</span>
+            </div>
+            <div class="tile-sparkline-wrap">
+              <canvas id="sparklineCpu" class="sparkline-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Плитка 2: RAM -->
+        <div class="tile-card" id="tileRam">
+          <div class="tile-header">
+            <span class="tile-title">Оперативна пам'ять</span>
+            <span class="tile-subinfo" id="ramTotalInfo">-- ГБ</span>
+          </div>
+          <div class="tile-body">
+            <div class="tile-value-group">
+              <span class="tile-value" id="ramPercentVal">--%</span>
+              <span class="tile-caption" id="ramUsedCaption">-- / -- ГБ</span>
+            </div>
+            <div class="tile-sparkline-wrap">
+              <canvas id="sparklineRam" class="sparkline-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Плитка 3: GPU (Відеокарта) -->
+        <div class="tile-card" id="tileGpu">
+          <div class="tile-header">
+            <span class="tile-title">Відеокарта</span>
+            <span class="tile-subinfo" id="gpuNameInfo">NVIDIA GPU</span>
+          </div>
+          <div class="tile-body">
+            <div class="tile-value-group">
+              <span class="tile-value" id="gpuPercentVal">--%</span>
+              <span class="tile-caption" id="gpuCaption">VRAM: -- / -- • --°C</span>
+            </div>
+            <div class="tile-sparkline-wrap">
+              <canvas id="sparklineGpu" class="sparkline-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Плитка 4: Мережа -->
+        <div class="tile-card" id="tileNet">
+          <div class="tile-header">
+            <span class="tile-title">Мережа</span>
+            <span class="tile-subinfo">Активність I/O</span>
+          </div>
+          <div class="tile-body">
+            <div class="tile-value-group">
+              <span class="tile-value" id="netRecvVal" style="font-size: 24px;">↓ 0 КБ/с</span>
+              <span class="tile-caption" id="netSentVal">↑ 0 КБ/с</span>
+            </div>
+            <div class="tile-sparkline-wrap">
+              <canvas id="sparklineNet" class="sparkline-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Великий графік навантаження CPU, RAM та GPU -->
+      <section class="chart-section">
+        <div class="chart-header">
+          <div class="chart-title-group">
+            <h2 class="chart-title">Динаміка навантаження</h2>
+            <div class="chart-legend">
+              <div class="legend-item">
+                <span class="legend-bullet bullet-cpu"></span>
+                <span>CPU</span>
+              </div>
+              <div class="legend-item" id="peakCpuLegend" style="display: none;">
+                <span class="legend-bullet bullet-cpu-peak"></span>
+                <span>Пік CPU (max)</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-bullet bullet-ram"></span>
+                <span>RAM</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-bullet bullet-gpu"></span>
+                <span>GPU</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Перемикач періодів -->
+          <div class="chart-tabs">
+            <button class="tab-btn active" data-range="live" id="tabLive">Наживо</button>
+            <button class="tab-btn" data-range="hour" id="tabHour">Година</button>
+            <button class="tab-btn" data-range="day" id="tabDay">День</button>
+          </div>
+        </div>
+
+        <div class="chart-canvas-container" id="chartContainer">
+          <canvas id="mainTelemetryChart"></canvas>
+          <div id="chartTooltip" class="chart-tooltip">
+            <div class="tt-time" id="ttTime">--:--:--</div>
+            <div class="tt-row">
+              <span style="color: var(--accent-blue);">CPU:</span>
+              <strong id="ttCpu">--%</strong>
+            </div>
+            <div class="tt-row" id="ttCpuPeakRow" style="display: none;">
+              <span style="color: rgba(76, 141, 255, 0.7);">Пік CPU:</span>
+              <strong id="ttCpuPeak">--%</strong>
+            </div>
+            <div class="tt-row">
+              <span style="color: var(--accent-purple);">RAM:</span>
+              <strong id="ttRam">--%</strong>
+            </div>
+            <div class="tt-row" id="ttGpuRow" style="display: none;">
+              <span style="color: #f0883e;">GPU:</span>
+              <strong id="ttGpu">--%</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Середня сітка: Ядра процесора та Диски -->
+      <section class="middle-grid">
+        <!-- Картка: Ядра процесора -->
+        <div class="cores-card">
+          <div class="cores-header">
+            <h3 class="cores-title">Ядра процесора</h3>
+            <span class="cores-count" id="coresHeaderCount">--</span>
+          </div>
+          <div class="cores-bars-grid" id="coresGrid">
+            <div class="empty-state">Завантаження ядер...</div>
+          </div>
+        </div>
+
+        <!-- Картка: Диски (всі розділи зі спільною швидкістю) -->
+        <div class="disks-card">
+          <div class="disks-header">
+            <div class="disks-header-left">
+              <h3 class="disks-title">Диски</h3>
+              <span class="disks-type">NVMe SSD</span>
+            </div>
+            <div class="disks-speed" id="disksSharedSpeed">
+              <span id="diskSharedRead">↓ 0 КБ/с</span>
+              <span id="diskSharedWrite">↑ 0 КБ/с</span>
+            </div>
+          </div>
+          <div class="disks-list" id="disksList">
+            <div class="empty-state">Завантаження розділів...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Нижня секція: Топ процесів -->
+      <section class="processes-section">
+        <div class="processes-card">
+          <div class="processes-header">
+            <h3 class="processes-title">Топ процесів</h3>
+            <div class="processes-sort-controls">
+              <span>Сортування:</span>
+              <button class="sort-btn active" data-sort="cpu" id="sortCpuBtn">CPU %</button>
+              <button class="sort-btn" data-sort="ram" id="sortRamBtn">RAM %</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="proc-table">
+              <thead>
+                <tr>
+                  <th style="width: 35%;">Назва процесу</th>
+                  <th style="width: 15%;">PID</th>
+                  <th style="width: 25%;">CPU %</th>
+                  <th style="width: 12%;">RAM %</th>
+                  <th style="width: 13%;">Пам'ять</th>
+                </tr>
+              </thead>
+              <tbody id="processesTableBody">
+                <tr>
+                  <td colspan="5">
+                    <div class="empty-state">Отримання списку процесів...</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- РОЗДІЛ 2: АНАЛІТИКА ТА ІНДЕКС ЗДОРОВ'Я СИСТЕМИ                       -->
+    <!-- =================================================================== -->
+    <section id="viewAnalytics" class="view-panel">
+      <!-- Перемикач періоду аналітики -->
+      <div class="panel-header-controls">
+        <div class="panel-title-wrap">
+          <h2 class="panel-main-title">Системна аналітика</h2>
+          <span class="panel-subtitle">Оцінка стабільності, ресурсів та прогнозів</span>
+        </div>
+        <div class="period-toggle-group">
+          <button class="period-btn" data-period="1h">1 година</button>
+          <button class="period-btn active" data-period="24h">24 години</button>
+          <button class="period-btn" data-period="7d">7 днів</button>
+        </div>
+      </div>
+
+      <!-- Картка Індексу здоров'я та Зведення -->
+      <div class="analytics-top-grid">
+        <!-- Блок індексу здоров'я -->
+        <div class="card-fluent health-card">
+          <div class="health-card-header">
+            <h3>Індекс здоров'я системи</h3>
+            <span id="healthStatusBadge" class="health-badge badge-green">Відмінний</span>
+          </div>
+          <div class="health-score-container">
+            <div class="health-score-dial">
+              <span id="healthScoreValue" class="health-score-number">100</span>
+              <span class="health-score-max">/ 100</span>
+            </div>
+            <div class="health-desc">
+              <p id="healthScoreDesc">Система працює стабільно в оптимальних температурних і навантажувальних межах.</p>
+              <div class="health-factors" id="healthFactorsList"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Блок середніх і пікових значень -->
+        <div class="card-fluent stats-card">
+          <h3>Середні та пікові навантаження</h3>
+          <div class="analytics-metrics-grid">
+            <div class="analytics-metric-box">
+              <span class="amb-label">CPU Середнє / Пік</span>
+              <div class="amb-values">
+                <strong id="anaCpuAvg">--%</strong>
+                <span class="amb-peak" id="anaCpuPeak">Пік: --%</span>
+              </div>
+            </div>
+            <div class="analytics-metric-box">
+              <span class="amb-label">RAM Середнє / Пік</span>
+              <div class="amb-values">
+                <strong id="anaRamAvg">--%</strong>
+                <span class="amb-peak" id="anaRamPeak">Пік: --%</span>
+              </div>
+            </div>
+            <div class="analytics-metric-box">
+              <span class="amb-label">GPU Середнє / Пік</span>
+              <div class="amb-values">
+                <strong id="anaGpuAvg">--%</strong>
+                <span class="amb-peak" id="anaGpuPeak">Пік: --%</span>
+              </div>
+            </div>
+            <div class="analytics-metric-box">
+              <span class="amb-label">GPU Температура</span>
+              <div class="amb-values">
+                <strong id="anaGpuTempAvg">--°C</strong>
+                <span class="amb-peak" id="anaGpuTempPeak">Пік: --°C</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Червона зона -->
+          <div class="redzone-box">
+            <div class="redzone-title">
+              <span>⚠️ Час у червоній зоні (CPU > 90%, RAM > 85%)</span>
+            </div>
+            <div class="redzone-items">
+              <div class="rz-item">
+                <span>Процесор:</span>
+                <strong id="anaCpuRz">0 с (0%)</strong>
+              </div>
+              <div class="rz-item">
+                <span>Пам'ять:</span>
+                <strong id="anaRamRz">0 с (0%)</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Прогноз заповнення дисків -->
+      <div class="card-fluent">
+        <h3 style="margin-bottom: 14px;">Прогноз заповнення дискових розділів</h3>
+        <div class="disk-projections-grid" id="diskProjectionsContainer">
+          <div class="empty-state">Аналіз використання дисків...</div>
+        </div>
+      </div>
+
+      <!-- Топ програм за навантаженням (погодинні агрегати) -->
+      <div class="card-fluent">
+        <h3 style="margin-bottom: 14px;">Топ програм за навантаженням у цей період</h3>
+        <div class="table-wrap">
+          <table class="proc-table">
+            <thead>
+              <tr>
+                <th style="width: 30%;">Програма</th>
+                <th style="width: 15%;">Появ у топі</th>
+                <th style="width: 18%;">Середній CPU %</th>
+                <th style="width: 18%;">Піковий CPU %</th>
+                <th style="width: 19%;">Макс. RAM %</th>
+              </tr>
+            </thead>
+            <tbody id="analyticsTopAppsBody">
+              <tr>
+                <td colspan="5"><div class="empty-state">Завантаження аналітики програм...</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Рейтинг винуватців тривог -->
+      <div class="card-fluent">
+        <h3 style="margin-bottom: 14px;">Рейтинг винуватців тривог (Culprits)</h3>
+        <div class="table-wrap">
+          <table class="proc-table">
+            <thead>
+              <tr>
+                <th style="width: 35%;">Програма</th>
+                <th style="width: 15%;">Спричинено тривог</th>
+                <th style="width: 25%;">Сер. CPU під час тривоги</th>
+                <th style="width: 25%;">Пік CPU під час тривоги</th>
+              </tr>
+            </thead>
+            <tbody id="analyticsCulpritsBody">
+              <tr>
+                <td colspan="4"><div class="empty-state">Немає зафіксованих тривог за період</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- РОЗДІЛ 3: ШІ-ПОРАДНИК (AI Advisor)                                  -->
+    <!-- =================================================================== -->
+    <section id="viewAi" class="view-panel">
+      <div class="panel-header-controls">
+        <div class="panel-title-wrap">
+          <h2 class="panel-main-title">🤖 ШІ-порадник з оптимізації</h2>
+          <span class="panel-subtitle">Аналіз ресурсів комп'ютера, виявлення проблем та персональні рекомендації</span>
+        </div>
+        <div id="aiKeyStatusBadge" class="status-badge" title="Стан підключення до Gemini API">
+          <span id="aiKeyStatusDot" class="status-dot"></span>
+          <span id="aiKeyStatusText">Перевірка Gemini API...</span>
+        </div>
+      </div>
+
+      <div class="ai-main-grid">
+        <!-- Блок 1: Автопорада з оптимізації -->
+        <div class="card-fluent ai-advice-card">
+          <div class="ai-card-header">
+            <div>
+              <h3>Експертна оцінка системи</h3>
+              <p class="card-caption">Автоматичний аналіз навантаження та вузьких місць за обраний період</p>
+            </div>
+            <div class="ai-period-controls">
+              <div class="period-toggle-group">
+                <button class="period-btn ai-period-btn" data-ai-period="1h">1 год</button>
+                <button class="period-btn ai-period-btn active" data-ai-period="24h">24 год</button>
+                <button class="period-btn ai-period-btn" data-ai-period="7d">7 днів</button>
+              </div>
+              <button id="btnGetAiAdvice" class="btn-primary">
+                <span id="aiAdviceBtnSpinner" class="spinner-inline" style="display: none;"></span>
+                <span>✨ Отримати пораду</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Результат автопоради -->
+          <div class="ai-advice-result-wrap" id="aiAdviceResultWrap">
+            <div class="ai-advice-meta" id="aiAdviceMeta" style="display: none;">
+              <span id="aiAdviceSourceBadge" class="source-badge">Gemini</span>
+              <span id="aiAdviceTimestamp" class="ai-timestamp">--:--:--</span>
+            </div>
+            <div id="aiAdviceContent" class="ai-markdown-body">
+              <div class="empty-state">
+                Натисніть кнопку «Отримати пораду», щоб ШІ проаналізував продуктивність комп'ютера за обраний період.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Блок 2: Інтерактивний чат із ШІ -->
+        <div class="card-fluent ai-chat-card">
+          <div class="ai-card-header">
+            <div>
+              <h3>Чат із ШІ-інженером</h3>
+              <p class="card-caption">Запитуйте про ресурси, процеси та способи прискорення саме цього ПК</p>
+            </div>
+            <button id="btnClearChat" class="btn-secondary btn-sm" title="Очистити історію листування">Очистити чат</button>
+          </div>
+
+          <!-- Контейнер повідомлень -->
+          <div class="chat-messages-container" id="chatMessagesContainer">
+            <div class="chat-message bot-message">
+              <div class="message-sender">
+                <span>🤖 ШІ-порадник</span>
+                <span class="source-tag">Система</span>
+              </div>
+              <div class="message-bubble">
+                Вітаю! Я проаналізую ресурси, процеси та характеристики вашого ПК. Запитайте мене про стан процесора, пам'яті, дискового простору чи способи оптимізації.
+              </div>
+            </div>
+          </div>
+
+          <!-- Індикатор друкування ШІ -->
+          <div id="chatTypingIndicator" class="chat-typing" style="display: none;">
+            <div class="typing-bubble">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-text">ШІ аналізує систему...</span>
+            </div>
+          </div>
+
+          <!-- Форма введення -->
+          <div class="chat-input-wrap">
+            <div class="chat-input-row">
+              <textarea
+                id="chatInputText"
+                class="chat-textarea"
+                placeholder="Запитайте про процеси, пам'ять або оптимізацію цього ПК... (Enter — надіслати, Shift+Enter — новий рядок)"
+                maxlength="500"
+                rows="2"
+              ></textarea>
+              <button id="btnSendChatMessage" class="btn-primary btn-chat-send" title="Надіслати повідомлення">
+                <span>Надіслати</span>
+              </button>
+            </div>
+            <div class="chat-input-footer">
+              <span class="chat-hint">Максимум 500 символів • У контексті до 6 останніх реплік</span>
+              <span id="chatCharCounter" class="char-counter">0 / 500</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- РОЗДІЛ 4: СПОВІЩЕННЯ (Alerts)                                        -->
+    <!-- =================================================================== -->
+    <section id="viewAlerts" class="view-panel">
+      <div class="panel-header-controls">
+        <div class="panel-title-wrap">
+          <h2 class="panel-main-title">Журнал тривог та винуватців</h2>
+          <span class="panel-subtitle">Моніторинг критичних перевищень порогів (CPU, RAM, GPU, диски)</span>
+        </div>
+      </div>
+
+      <!-- Блок активних тривог -->
+      <div class="card-fluent" id="activeAlertsCard">
+        <div class="section-badge-header">
+          <h3 style="color: var(--status-red);">🔥 Активні тривоги зараз</h3>
+          <span class="badge-pill badge-red" id="activeAlertsPill">0 активних</span>
+        </div>
+        <div id="activeAlertsList" class="alerts-feed">
+          <div class="empty-state-success">Всі показники системи в нормі. Активних тривог немає.</div>
+        </div>
+      </div>
+
+      <!-- Історія тривог -->
+      <div class="card-fluent" style="margin-top: 16px;">
+        <h3 style="margin-bottom: 14px;">Історія вирішених тривог</h3>
+        <div id="resolvedAlertsList" class="alerts-feed">
+          <div class="empty-state">Історія тривог порожня</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- РОЗДІЛ 4: ХАРАКТЕРИСТИКИ СИСТЕМИ (System Specs)                     -->
+    <!-- =================================================================== -->
+    <section id="viewSpecs" class="view-panel">
+      <div class="panel-header-controls">
+        <div class="panel-title-wrap">
+          <h2 class="panel-main-title">Характеристики комп'ютера</h2>
+          <span class="panel-subtitle">Апаратне та програмне забезпечення ПК (Windows 11)</span>
+        </div>
+        <button id="btnRefreshSpecs" class="btn-secondary">Оновити</button>
+      </div>
+
+      <div class="specs-grid">
+        <!-- Картка: Процесор -->
+        <div class="card-fluent spec-card">
+          <div class="spec-card-header">
+            <span class="spec-icon">🧠</span>
+            <h4>Процесор (CPU)</h4>
+          </div>
+          <div class="spec-rows" id="specCpuRows">
+            <div class="empty-state">Отримання інформації про CPU...</div>
+          </div>
+        </div>
+
+        <!-- Картка: Пам'ять -->
+        <div class="card-fluent spec-card">
+          <div class="spec-card-header">
+            <span class="spec-icon">⚡</span>
+            <h4>Оперативна пам'ять (RAM)</h4>
+          </div>
+          <div class="spec-rows" id="specRamRows">
+            <div class="empty-state">Отримання інформації про RAM...</div>
+          </div>
+        </div>
+
+        <!-- Картка: Відеокарта -->
+        <div class="card-fluent spec-card">
+          <div class="spec-card-header">
+            <span class="spec-icon">🎮</span>
+            <h4>Відеоадаптери (GPU)</h4>
+          </div>
+          <div class="spec-rows" id="specGpuRows">
+            <div class="empty-state">Отримання інформації про GPU...</div>
+          </div>
+        </div>
+
+        <!-- Картка: ОС та запуск -->
+        <div class="card-fluent spec-card">
+          <div class="spec-card-header">
+            <span class="spec-icon">🪟</span>
+            <h4>Операційна система та запуск</h4>
+          </div>
+          <div class="spec-rows" id="specOsRows">
+            <div class="empty-state">Отримання інформації про ОС...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Розділи дисків таблицею -->
+      <div class="card-fluent" style="margin-top: 16px;">
+        <h4 style="margin-bottom: 14px;">Розділи дисків та файлові системи</h4>
+        <div class="table-wrap">
+          <table class="proc-table">
+            <thead>
+              <tr>
+                <th>Точка монтування</th>
+                <th>Пристрій</th>
+                <th>Файлова система</th>
+                <th>Загальний розмір</th>
+                <th>Вільний простір</th>
+                <th>Використано</th>
+              </tr>
+            </thead>
+            <tbody id="specsDisksBody">
+              <tr>
+                <td colspan="6"><div class="empty-state">Завантаження розділів...</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Модальне вікно вибору періоду для Excel експорту -->
+  <div id="exportModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Експорт системного звіту в Excel</h3>
+        <button id="btnCloseExportModal" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Звіт міститиме 6 стилізованих аркушів: Характеристики, Зведення, Метрики з графіком, Програми, Сповіщення та Поради ШІ.
+        </p>
+
+        <label style="font-weight: 600; margin-bottom: 8px; display: block;">Оберіть період звіту:</label>
+        <div class="export-options-grid">
+          <label class="radio-option">
+            <input type="radio" name="exportPeriod" value="1h" checked>
+            <span>Остання 1 година (10 с дискретизація)</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="exportPeriod" value="24h">
+            <span>Останні 24 години (похвилинно)</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="exportPeriod" value="7d">
+            <span>Останні 7 днів</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="exportPeriod" value="all">
+            <span>За весь доступний час</span>
+          </label>
+        </div>
+
+        <div id="exportProgressWrap" style="display: none; margin-top: 16px;">
+          <div class="export-loading-spinner"></div>
+          <span id="exportProgressText" style="color: var(--accent-blue);">Генерація файлу Excel...</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnCancelExport" class="btn-secondary">Скасувати</button>
+        <button id="btnStartExport" class="btn-primary">Завантажити .xlsx</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Підключення скриптів дашборду -->
+  <script src="/static/js/chart.js"></script>
+  <script src="/static/js/tabs.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

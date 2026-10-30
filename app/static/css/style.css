@@ -1,0 +1,1778 @@
+/* Windows 11 Fluent Dark Theme для System Monitor */
+
+:root {
+  --bg-primary: #0f1115;
+  --bg-secondary: #161920;
+  --bg-card: rgba(255, 255, 255, 0.04);
+  --bg-card-hover: rgba(255, 255, 255, 0.07);
+  --border-card: rgba(255, 255, 255, 0.08);
+  --border-card-hover: rgba(255, 255, 255, 0.14);
+
+  --text-primary: #f0f3f6;
+  --text-secondary: #8b949e;
+  --text-muted: #586069;
+
+  /* Акценти та кольори ліній */
+  --accent-blue: #4c8dff;
+  --accent-blue-soft: rgba(76, 141, 255, 0.15);
+  --accent-purple: #a78bfa;
+  --accent-purple-soft: rgba(167, 139, 250, 0.15);
+
+  /* Кольори стану значень */
+  --status-green: #3fb950;
+  --status-yellow: #d29922;
+  --status-red: #f85149;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  user-select: none;
+}
+
+/* Головний контейнер */
+.app-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 1. Шапка (Header) */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-sm);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(76, 141, 255, 0.4);
+}
+
+.brand-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: rgba(63, 185, 80, 0.12);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--status-green);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--status-green);
+  box-shadow: 0 0 8px var(--status-green);
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.current-time {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+/* 2. Ряд із 4 плиток (Tiles) */
+.tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.tile-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.tile-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-card-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.tile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.tile-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+.tile-subinfo {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tile-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.tile-value-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.tile-value {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+}
+
+.tile-caption {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.tile-sparkline-wrap {
+  width: 90px;
+  height: 38px;
+}
+
+.sparkline-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Динамічні класи стану значень */
+.val-green { color: var(--status-green) !important; }
+.val-yellow { color: var(--status-yellow) !important; }
+.val-red { color: var(--status-red) !important; }
+
+/* 3. Головна область графіка */
+.chart-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.chart-title-group {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.chart-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.legend-bullet {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.bullet-cpu { background-color: var(--accent-blue); }
+.bullet-cpu-peak {
+  background: repeating-linear-gradient(45deg, var(--accent-blue), var(--accent-blue) 2px, transparent 2px, transparent 4px);
+  border: 1px dashed var(--accent-blue);
+}
+.bullet-ram { background-color: var(--accent-purple); }
+.bullet-gpu { background-color: #f0883e; }
+
+/* Вкладки графіка */
+.chart-tabs {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 14px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+  background: var(--accent-blue);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 6px rgba(76, 141, 255, 0.4);
+}
+
+/* Canvas область та Tooltip */
+.chart-canvas-container {
+  position: relative;
+  width: 100%;
+  height: 280px;
+}
+
+#mainTelemetryChart {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background: rgba(22, 25, 32, 0.95);
+  border: 1px solid var(--border-card-hover);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  transform: translate(-50%, -110%);
+  display: none;
+  z-index: 100;
+  min-width: 140px;
+}
+
+.chart-tooltip .tt-time {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 3px;
+}
+
+.chart-tooltip .tt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 3px;
+}
+
+/* 4. Середня сітка: Ядра процесора та Диски (50% / 50%) */
+.middle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Блок ядер: 2 рівні ряди по 8 колонок (або авто), смужки на всю ширину */
+.cores-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+}
+
+.cores-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.cores-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.cores-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.cores-bars-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--core-cols, 8), 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 8px;
+  width: 100%;
+  padding: 6px 0;
+  flex: 1;
+  align-items: stretch;
+}
+
+.core-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.core-pct-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-feature-settings: "tnum";
+}
+
+.core-bar-track {
+  width: 100%;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  position: relative;
+}
+
+.core-bar-fill {
+  width: 100%;
+  height: 0%;
+  background: var(--accent-blue);
+  border-radius: 4px;
+  transition: height 0.3s ease, background-color 0.3s ease;
+}
+
+.core-bar-fill.val-green {
+  background-color: var(--accent-blue) !important;
+}
+
+.core-bar-fill.val-yellow {
+  background-color: var(--status-yellow) !important;
+}
+
+.core-bar-fill.val-red {
+  background-color: var(--status-red) !important;
+}
+
+.core-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Блок дисків (розділи NVMe SSD зі спільною швидкістю) */
+.disks-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+}
+
+.disks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.disks-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.disks-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.disks-type {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  background: var(--accent-blue-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(76, 141, 255, 0.3);
+}
+
+.disks-speed {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 12px;
+  font-feature-settings: "tnum";
+}
+
+.disks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+  flex: 1;
+}
+
+.disk-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.disk-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.disk-item-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+}
+
+.disk-item-stats {
+  color: var(--text-secondary);
+  font-feature-settings: "tnum";
+  font-size: 11px;
+}
+
+.disk-item-pct {
+  font-weight: 700;
+  font-feature-settings: "tnum";
+}
+
+.disk-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.disk-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background-color: var(--accent-blue);
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.disk-bar-fill.val-green {
+  background-color: var(--status-green) !important;
+}
+
+.disk-bar-fill.val-yellow {
+  background-color: var(--status-yellow) !important;
+}
+
+.disk-bar-fill.val-red {
+  background-color: var(--status-red) !important;
+}
+
+/* 5. Нижня секція: Топ процесів */
+.processes-section {
+  width: 100%;
+}
+
+.processes-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+}
+
+.processes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.processes-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.processes-sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sort-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.sort-btn.active {
+  background: var(--accent-blue);
+  color: #fff;
+  border-color: var(--accent-blue);
+}
+
+/* Стилізована таблиця процесів */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.proc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.proc-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-card);
+}
+
+.proc-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+.proc-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.proc-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.proc-pid {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.proc-bar-cell {
+  position: relative;
+  min-width: 100px;
+}
+
+.proc-cpu-bar-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.proc-cpu-bar-fill {
+  height: 100%;
+  background: var(--accent-blue);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Стани "Немає даних" та "Завантаження" */
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Адаптивність */
+@media (max-width: 1024px) {
+  .tiles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .middle-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================================================= */
+/* ЕТАП 3: НАВІГАЦІЯ, АНАЛІТИКА, СПОВІЩЕННЯ, ХАРАКТЕРИСТИКИ, МОДАЛКА EXCEL     */
+/* ========================================================================= */
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-action {
+  background: rgba(76, 141, 255, 0.12);
+  border: 1px solid rgba(76, 141, 255, 0.3);
+  color: var(--accent-blue);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.btn-action:hover {
+  background: rgba(76, 141, 255, 0.22);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+}
+
+.alerts-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(248, 81, 73, 0.15);
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  color: var(--status-red);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  animation: pulse-border 2s infinite ease-in-out;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(248, 81, 73, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
+}
+
+/* Головне навігаційне меню */
+.main-nav {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(12px);
+}
+
+.nav-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition);
+}
+
+.nav-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-tab-btn.active {
+  background: rgba(76, 141, 255, 0.14);
+  color: var(--accent-blue);
+  border-color: rgba(76, 141, 255, 0.35);
+  box-shadow: 0 0 10px rgba(76, 141, 255, 0.2);
+}
+
+.nav-count-badge {
+  background: var(--status-red);
+  color: #fff;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+/* Панелі розділів */
+.view-panel {
+  display: none;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.view-panel.active {
+  display: flex;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Універсальна картка Fluent */
+.card-fluent {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.card-fluent:hover {
+  border-color: var(--border-card-hover);
+}
+
+/* Заголовки панелей */
+.panel-header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.panel-main-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.panel-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.period-toggle-group {
+  display: flex;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  gap: 4px;
+  border: 1px solid var(--border-card);
+}
+
+.period-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.period-btn:hover {
+  color: var(--text-primary);
+}
+
+.period-btn.active {
+  background: var(--accent-blue);
+  color: #fff;
+  box-shadow: 0 0 8px rgba(76, 141, 255, 0.4);
+}
+
+/* Верхній блок аналітики */
+.analytics-top-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .analytics-top-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.health-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.health-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.health-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.badge-green { background: rgba(63, 185, 80, 0.15); color: var(--status-green); border: 1px solid rgba(63, 185, 80, 0.3); }
+.badge-blue { background: rgba(76, 141, 255, 0.15); color: var(--accent-blue); border: 1px solid rgba(76, 141, 255, 0.3); }
+.badge-yellow { background: rgba(210, 153, 34, 0.15); color: var(--status-yellow); border: 1px solid rgba(210, 153, 34, 0.3); }
+.badge-red { background: rgba(248, 81, 73, 0.15); color: var(--status-red); border: 1px solid rgba(248, 81, 73, 0.3); }
+
+.health-score-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.health-score-dial {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.health-score-number {
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent-blue);
+}
+
+.health-score-max {
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.health-desc p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.health-factors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.factor-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+  padding-bottom: 4px;
+}
+
+.factor-penalty {
+  color: var(--status-red);
+  font-weight: 600;
+}
+
+/* Статистика аналітики */
+.analytics-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1024px) {
+  .analytics-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.analytics-metric-box {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.amb-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.amb-values {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.amb-values strong {
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.amb-peak {
+  font-size: 11px;
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.redzone-box {
+  background: rgba(248, 81, 73, 0.06);
+  border: 1px solid rgba(248, 81, 73, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.redzone-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--status-red);
+}
+
+.redzone-items {
+  display: flex;
+  gap: 20px;
+}
+
+.rz-item {
+  font-size: 13px;
+  display: flex;
+  gap: 6px;
+}
+
+.rz-item strong {
+  color: var(--text-primary);
+}
+
+/* Прогнози дисків */
+.disk-projections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.dp-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dp-mount {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dp-free {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.dp-projection-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--accent-blue);
+}
+
+.dp-projection-text.warning {
+  border-left-color: var(--status-red);
+  color: #ff9492;
+}
+
+/* Стрічка тривог */
+.alerts-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.alert-item {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: var(--transition);
+}
+
+.alert-item.active {
+  background: rgba(248, 81, 73, 0.08);
+  border-color: rgba(248, 81, 73, 0.4);
+  box-shadow: 0 0 14px rgba(248, 81, 73, 0.15);
+}
+
+.alert-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.alert-rule-title {
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-red);
+  box-shadow: 0 0 8px var(--status-red);
+}
+
+.alert-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.alert-culprits-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.culprit-tag {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: monospace;
+}
+
+.empty-state-success {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  color: var(--status-green);
+  font-size: 14px;
+  background: rgba(63, 185, 80, 0.05);
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(63, 185, 80, 0.2);
+}
+
+/* Характеристики комп'ютера */
+.specs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.spec-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.spec-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 10px;
+}
+
+.spec-icon {
+  font-size: 20px;
+}
+
+.spec-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spec-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.spec-row span {
+  color: var(--text-secondary);
+}
+
+.spec-row strong {
+  color: var(--text-primary);
+  text-align: right;
+  max-width: 60%;
+  word-break: break-word;
+}
+
+/* Кнопка другорядної дії */
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-card);
+  color: var(--text-primary);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-primary {
+  background: var(--accent-blue);
+  border: 1px solid rgba(76, 141, 255, 0.5);
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 0 12px rgba(76, 141, 255, 0.3);
+}
+
+.btn-primary:hover {
+  background: #3a7eed;
+  transform: translateY(-1px);
+}
+
+/* Модальне вікно */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.modal-card {
+  background: #14171d;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.modal-header h3 {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.modal-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.export-options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-card);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  transition: var(--transition);
+}
+
+.radio-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.radio-option input[type="radio"] {
+  accent-color: var(--accent-blue);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.export-loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(76, 141, 255, 0.2);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Спливаючі сповіщення (Toasts) */
+.toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+  max-width: 380px;
+  pointer-events: none;
+}
+
+.toast-card {
+  pointer-events: auto;
+  background: rgba(22, 25, 32, 0.95);
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  border-left: 4px solid var(--status-red);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.toast-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toast-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--status-red);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toast-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.toast-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.toast-culprits {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.toast-card.toast-success {
+  border-color: rgba(63, 185, 80, 0.4);
+  border-left-color: var(--status-green);
+}
+
+.toast-card.toast-success .toast-title {
+  color: var(--status-green);
+}
+
+/* =========================================================================
+   РОЗДІЛ: ШІ-ПОРАДНИК (AI Advisor & Chat)
+   ========================================================================= */
+.ai-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 1024px) {
+  .ai-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ai-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ai-card-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.card-caption {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.ai-period-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Автопорада */
+.ai-advice-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+
+.ai-advice-result-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  overflow-y: auto;
+  max-height: 520px;
+}
+
+.ai-advice-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-card);
+}
+
+.source-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(76, 141, 255, 0.15);
+  color: var(--accent-blue);
+  border: 1px solid rgba(76, 141, 255, 0.3);
+}
+
+.source-badge.fallback {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--status-yellow);
+  border-color: rgba(210, 153, 34, 0.3);
+}
+
+.ai-timestamp {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ai-markdown-body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.ai-markdown-body strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.ai-markdown-body li {
+  margin-left: 20px;
+  margin-bottom: 6px;
+}
+
+.ai-markdown-body code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  color: #a78bfa;
+}
+
+/* Чат */
+.ai-chat-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+
+.chat-messages-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  max-height: 420px;
+  min-height: 320px;
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 85%;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.chat-message.bot-message {
+  align-self: flex-start;
+}
+
+.chat-message.user-message {
+  align-self: flex-end;
+}
+
+.message-sender {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.user-message .message-sender {
+  justify-content: flex-end;
+}
+
+.source-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(76, 141, 255, 0.12);
+  color: var(--accent-blue);
+}
+
+.source-tag.fallback {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--status-yellow);
+}
+
+.message-bubble {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.bot-message .message-bubble {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-card);
+  color: var(--text-primary);
+  border-bottom-left-radius: 4px;
+}
+
+.user-message .message-bubble {
+  background: var(--accent-blue);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 2px 8px rgba(76, 141, 255, 0.3);
+}
+
+/* Індикатор друкування */
+.chat-typing {
+  align-self: flex-start;
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
+.typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-card);
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent-blue);
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+.typing-dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.typing-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+/* Поле введення чату */
+.chat-input-wrap {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-textarea {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  resize: none;
+  outline: none;
+  transition: var(--transition);
+}
+
+.chat-textarea:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 8px rgba(76, 141, 255, 0.3);
+}
+
+.btn-chat-send {
+  align-self: stretch;
+  padding: 0 18px;
+}
+
+.chat-input-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.chat-hint {
+  color: var(--text-muted);
+}
+
+.char-counter {
+  color: var(--text-muted);
+  font-feature-settings: "tnum";
+}
+
+.char-counter.limit-near {
+  color: var(--status-yellow);
+}
+
+.char-counter.limit-full {
+  color: var(--status-red);
+  font-weight: 700;
+}
+
+.spinner-inline {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 6px;
+}
+
+
