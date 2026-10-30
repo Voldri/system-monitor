@@ -154,5 +154,27 @@ class TestAnalytics(unittest.TestCase):
         self.assertEqual(status_bad, "Критичний")
         self.assertGreaterEqual(score_bad, 0, "Індекс не може бути меншим за 0")
 
+        # Перевірка нової формули штрафу за RAM: 55% -> 0, 80% -> 10, 100% -> 20
+        _, _, bd_55 = _calculate_health_index(
+            cpu_avg=0.0, ram_avg=55.0, cpu_rz_sec=0, ram_rz_sec=0,
+            duration_sec=3600, active_alerts_count=0, period_alerts_count=0,
+            min_disk_free_pct=40.0
+        )
+        self.assertEqual(bd_55["penalty_ram_load"], 0.0)
+
+        _, _, bd_80 = _calculate_health_index(
+            cpu_avg=0.0, ram_avg=80.0, cpu_rz_sec=0, ram_rz_sec=0,
+            duration_sec=3600, active_alerts_count=0, period_alerts_count=0,
+            min_disk_free_pct=40.0
+        )
+        self.assertEqual(bd_80["penalty_ram_load"], 10.0)
+
+        _, _, bd_100 = _calculate_health_index(
+            cpu_avg=0.0, ram_avg=100.0, cpu_rz_sec=0, ram_rz_sec=0,
+            duration_sec=3600, active_alerts_count=0, period_alerts_count=0,
+            min_disk_free_pct=40.0
+        )
+        self.assertEqual(bd_100["penalty_ram_load"], 20.0)
+
 if __name__ == "__main__":
     unittest.main()

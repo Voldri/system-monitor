@@ -35,6 +35,18 @@ _AUTO_ADVICE_CACHE: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL_SEC = 300  # 5 хвилин
 
 
+def _clean_mount_name(raw_mount: Any) -> str:
+    """
+    Повертає просту назву розділу диска без бекслешів (наприклад, 'C:' замість 'C:\\').
+    """
+    if not raw_mount:
+        return ""
+    m = str(raw_mount).strip()
+    if len(m) >= 2 and m[1] == ":":
+        return m[:2].upper()
+    return m.rstrip("\\/ ")
+
+
 def _anonymize_context(context: Dict[str, Any]) -> Dict[str, Any]:
     """
     Замінює реальні назви процесів на «процес 1, 2…», якщо AI_SEND_PROCESS_NAMES == False.
@@ -122,7 +134,7 @@ def build_ai_context(period: str = "24h", db_path=None) -> Dict[str, Any]:
         ],
         "disks": [
             {
-                "mount": d.get("mountpoint") or d.get("mount"),
+                "mount": _clean_mount_name(d.get("mountpoint") or d.get("mount") or d.get("device")),
                 "total_gb": d.get("total_gb"),
                 "free_gb": d.get("free_gb"),
                 "used_percent": d.get("used_percent"),
@@ -139,7 +151,7 @@ def build_ai_context(period: str = "24h", db_path=None) -> Dict[str, Any]:
         "summary": analytics.get("summary", {}),
         "disk_projections": [
             {
-                "mount": p.get("mountpoint"),
+                "mount": _clean_mount_name(p.get("mountpoint") or p.get("mount")),
                 "free_gb": p.get("free_gb"),
                 "free_percent": p.get("free_percent"),
                 "days_to_full": p.get("days_to_full"),
@@ -316,10 +328,11 @@ def get_auto_advice(period: str = "24h", db_path=None, force: bool = False) -> D
     else:
         # 3. Запит до Gemini generateContent
         user_prompt = (
-            f"Ось поточні телеметричні дані цього комп'ютера за період {period}:\n"
+            f"Завдання: аналіз продуктивності та оптимізація саме цього комп'ютера. "
+            f"Нижче наведено зібрані телеметричні показники за період {period}:\n"
             f"```json\n{context_json}\n```\n"
-            f"Проаналізуй навантаження ресурсів, характеристики та можливі вузькі місця. "
-            f"Сформулюй короткий висновок та від 2 до 4 конкретних порад з оптимізації."
+            f"Проаналізуй надані дані цього ПК (навантаження CPU, RAM, GPU, диски, тривоги та процеси), "
+            f"вияви можливі проблеми та сформулюй короткий висновок і від 2 до 4 конкретних практичних порад щодо оптимізації."
         )
 
         contents = [

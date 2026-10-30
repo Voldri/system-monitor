@@ -10,6 +10,16 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+
+def _clean_mount(raw: Any) -> str:
+    if not raw:
+        return "Диск"
+    s = str(raw).strip()
+    if len(s) >= 2 and s[1] == ":":
+        return s[:2].upper()
+    return s.rstrip("\\/ ")
+
+
 def generate_fallback_advice(context: Dict[str, Any]) -> str:
     """
     Генерує структуровану автопораду на основі поточного зрізу метрик та правил:
@@ -39,7 +49,7 @@ def generate_fallback_advice(context: Dict[str, Any]) -> str:
         elif free_pct is not None:
             free_pct = float(free_pct)
 
-        mount = d.get("mountpoint") or d.get("mount") or d.get("device") or "Диск"
+        mount = _clean_mount(d.get("mountpoint") or d.get("mount") or d.get("device"))
         if free_pct is not None and free_pct < 10.0:
             free_gb = d.get("free_gb", "--")
             issues.append(f"на розділі {mount} залишилося лише {free_pct:.1f}% вільного місця ({free_gb} ГБ)")
@@ -175,7 +185,7 @@ def generate_fallback_chat_reply(message: str, context: Dict[str, Any]) -> str:
     if any(k in msg_lower for k in ("диск", "disk", "ssd", "hdd", "місц", "папк", "вільно")):
         disks_info = []
         for d in disks:
-            m = d.get("mountpoint") or d.get("mount") or d.get("device")
+            m = _clean_mount(d.get("mountpoint") or d.get("mount") or d.get("device"))
             f_gb = d.get("free_gb", "--")
             t_gb = d.get("total_gb", "--")
             disks_info.append(f"{m} ({f_gb} ГБ вільно з {t_gb} ГБ)")
@@ -211,8 +221,9 @@ def generate_fallback_chat_reply(message: str, context: Dict[str, Any]) -> str:
     if any(k in msg_lower for k in ("оптиміз", "прискор", "очисти", "покращ", "гальму", "зависа")):
         return generate_fallback_advice(context)
 
-    # 6. Стороння тема (політика, погода, вірші тощо) — ввічлива відмова одним реченням
+    # 6. Стороння тема (політика, погода, вірші тощо) — ввічлива відмова з прикладом допомоги
     return (
         "[Автономний режим]\n\n"
-        "Я можу допомогти лише з аналізом ресурсів, процесів, характеристик та оптимізацією продуктивності цього комп'ютера."
+        "Я можу допомогти лише з аналізом ресурсів, процесів, характеристик та оптимізацією продуктивності цього комп'ютера. "
+        "Наприклад, запитайте мене про навантаження процесора (CPU), використання оперативної пам'яті (RAM) або стан вільного місця на дисках."
     )

@@ -12,13 +12,12 @@
 
 import io
 import json
-import logging
 import tempfile
 import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 
 import openpyxl
 
@@ -28,17 +27,12 @@ from app.db.connection import db_session, init_db
 from app.server import create_app
 from app.services.ai_advisor import (
     _AUTO_ADVICE_CACHE,
-    _call_gemini_rest,
     build_ai_context,
     chat_with_advisor,
-    get_ai_history,
     get_auto_advice,
 )
+from app.services.analytics import _calculate_health_index
 from app.services.exporter import generate_excel_report
-from app.services.fallback_advisor import (
-    generate_fallback_advice,
-    generate_fallback_chat_reply,
-)
 
 def _extract_title_text(title_obj) -> str:
     """
@@ -499,6 +493,91 @@ class TestAiAdvisor(unittest.TestCase):
                         p.unlink()
                     except Exception:
                         pass
+
+    @patch("urllib.request.urlopen")
+    def test_auto_advice_no_chat_history_in_request(self, mock_urlopen):
+        """
+        10. Перевірка, що автопорада виконується окремим запитом без історії чату,
+        а формулювання завдання є явно тематичним щодо оптимізації ПК.
+        """
+        config.GEMINI_API_KEY = "test-key-auto"
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({
+            "candidates": [{"content": {"parts": [{"text": "Висновок та поради"}]}}]
+        }).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        # Створюємо репліку в чаті
+        chat_with_advisor("Привіт, розкажи анекдот", period="24h", db_path=self.db_path)
+
+        # Викликаємо автопораду
+        res = get_auto_advice(period="24h", db_path=self.db_path, force=True)
+        self.assertEqual(res["status"], "ok")
+
+        # Перевіряємо запит автопоради
+        last_req = mock_urlopen.call_args_list[-1][0][0]
+        body = json.loads(last_req.data.decode("utf-8"))
+        contents = body.get("contents", [])
+
+        self.assertEqual(len(contents), 1, "Запит автопоради повинен містити рівно 1 блок без історії")
+        self.assertEqual(contents[0]["role"], "user")
+
+        prompt_text = contents[0]["parts"][0]["text"]
+        self.assertIn("Завдання: аналіз продуктивності та оптимізація", prompt_text)
+        self.assertNotIn("розкажи анекдот", prompt_text, "Історія чату не повинна бути в автопораді")
+
+    def test_context_no_backslashes_in_disk_mounts(self):
+        """
+        11. Перевірка, що контекст ШІ не містить «\\» у назвах розділів дисків ('C:', 'D:').
+        """
+        ctx = build_ai_context(period="24h", db_path=self.db_path)
+        for d in ctx.get("disks", []):
+            mount = d.get("mount", "")
+            self.assertNotIn("\\", mount, f"Розділ {mount} містить бекслеш")
+            if mount and len(mount) >= 2 and mount[1] == ":":
+                self.assertEqual(mount, mount[:2].upper())
+
+        for p in ctx.get("analytics", {}).get("disk_projections", []):
+            mount = p.get("mount", "")
+            self.assertNotIn("\\", mount, f"Розділ прогнозу {mount} містить бекслеш")
+
+        # Перевірка очищення _clean_mount_name
+        from app.services.ai_advisor import _clean_mount_name
+        self.assertEqual(_clean_mount_name("C:\\"), "C:")
+        self.assertEqual(_clean_mount_name("C:\\\\"), "C:")
+        self.assertEqual(_clean_mount_name("d:\\"), "D:")
+        self.assertEqual(_clean_mount_name("D:"), "D:")
+        self.assertEqual(_clean_mount_name("E:/"), "E:")
+
+    def test_health_index_ram_penalty_formula(self):
+        """
+        12. Перевірка нової формули штрафу за RAM в індексі здоров'я:
+        - 55% -> 0 балів
+        - 80% -> 10 балів
+        - 100% -> 20 балів
+        """
+        _, _, bd_55 = _calculate_health_index(
+            cpu_avg=0.0, ram_avg=55.0, cpu_rz_sec=0, ram_rz_sec=0,
+            duration_sec=3600, active_alerts_count=0, period_alerts_count=0,
+            min_disk_free_pct=40.0
+        )
+        self.assertEqual(bd_55["penalty_ram_load"], 0.0)
+
+        _, _, bd_80 = _calculate_health_index(
+            cpu_avg=0.0, ram_avg=80.0, cpu_rz_sec=0, ram_rz_sec=0,
+            duration_sec=3600, active_alerts_count=0, period_alerts_count=0,
+            min_disk_free_pct=40.0
+        )
+        self.assertEqual(bd_80["penalty_ram_load"], 10.0)
+
+        _, _, bd_100 = _calculate_health_index(
+            cpu_avg=0.0, ram_avg=100.0, cpu_rz_sec=0, ram_rz_sec=0,
+            duration_sec=3600, active_alerts_count=0, period_alerts_count=0,
+            min_disk_free_pct=40.0
+        )
+        self.assertEqual(bd_100["penalty_ram_load"], 20.0)
+
 
 if __name__ == "__main__":
     unittest.main()

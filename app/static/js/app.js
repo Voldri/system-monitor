@@ -996,8 +996,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderSafeMarkdown(text) {
     if (!text) return '';
+    // 0. Безпечна нормалізація подвійних бекслешів від моделі ШІ (наприклад, C:\\ -> C:\)
+    let safe = text.replace(/\\\\/g, '\\');
+
     // 1. Екранування HTML-символів проти XSS
-    let safe = text
+    safe = safe
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
