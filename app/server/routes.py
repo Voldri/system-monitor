@@ -12,10 +12,14 @@ import time
 from typing import Optional
 
 import psutil
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, send_file
 
+from app.core.alerts import AlertManager
 from app.db.connection import db_session
-from app.server.helpers import format_local_time, format_local_time_short
+from app.utils import format_local_time, format_local_time_short
+from app.services.analytics import get_system_analytics
+from app.services.exporter import generate_excel_report
+from app.services.specs import get_system_specs
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -143,13 +147,23 @@ def get_metrics_history():
         params = (cutoff,)
     elif range_param == "hour":
         cutoff = now - 3600
+        # Усереднення по 10 с з лінією піків cpu_max / ram_max
         query = """
-        SELECT timestamp, cpu_total, cpu_max, ram_percent, ram_max,
-               gpu_percent, gpu_max,
-               disk_read_bytes_sec, disk_write_bytes_sec, net_sent_bytes_sec, net_recv_bytes_sec,
-               is_aggregated
+        SELECT (timestamp / 10) * 10 AS timestamp,
+               ROUND(AVG(cpu_total), 1) AS cpu_total,
+               ROUND(MAX(cpu_max), 1) AS cpu_max,
+               ROUND(AVG(ram_percent), 1) AS ram_percent,
+               ROUND(MAX(ram_max), 1) AS ram_max,
+               ROUND(AVG(gpu_percent), 1) AS gpu_percent,
+               ROUND(MAX(gpu_max), 1) AS gpu_max,
+               ROUND(AVG(disk_read_bytes_sec), 1) AS disk_read_bytes_sec,
+               ROUND(AVG(disk_write_bytes_sec), 1) AS disk_write_bytes_sec,
+               ROUND(AVG(net_sent_bytes_sec), 1) AS net_sent_bytes_sec,
+               ROUND(AVG(net_recv_bytes_sec), 1) AS net_recv_bytes_sec,
+               MAX(is_aggregated) AS is_aggregated
         FROM metrics
         WHERE timestamp >= ?
+        GROUP BY timestamp / 10
         ORDER BY timestamp ASC
         """
         params = (cutoff,)
@@ -241,3 +255,84 @@ def get_processes():
         "count": len(procs),
         "processes": procs,
     })
+
+@api_bp.route("/system/specs", methods=["GET"])
+def get_specs_endpoint():
+    """Повертає характеристики комп'ютера (CPU, RAM, диски, GPU, ОС, Boot Time)."""
+    force = request.args.get("refresh", "false").lower() in ("true", "1")
+    specs = get_system_specs(force_refresh=force)
+    return jsonify(specs)
+
+@api_bp.route("/alerts", methods=["GET"])
+def get_alerts_endpoint():
+    """
+    Повертає журнал тривог із процесами-винуватцями:
+    - active=true: лише активні
+    - limit=50: кількість
+    """
+    active_only = request.args.get("active", "false").lower() in ("true", "1")
+    limit = min(max(int(request.args.get("limit", 50)), 1), 200)
+
+    collector = getattr(current_app, "collector", None)
+    if collector and hasattr(collector, "alert_manager"):
+        if active_only:
+            alerts = collector.alert_manager.get_active_alerts()
+        else:
+            alerts = collector.alert_manager.get_alerts(limit=limit)
+    else:
+        db_path = getattr(current_app, "db_path", None)
+        mgr = AlertManager(db_path=db_path)
+        if active_only:
+            alerts = mgr.get_active_alerts()
+        else:
+            alerts = mgr.get_alerts(limit=limit)
+
+    return jsonify({
+        "count": len(alerts),
+        "active_count": sum(1 for a in alerts if a.get("is_active")),
+        "alerts": alerts,
+    })
+
+@api_bp.route("/analytics", methods=["GET"])
+def get_analytics_endpoint():
+    """
+    Повертає системну аналітику:
+    - period=1h|24h|7d (за замовчуванням 24h)
+    """
+    period = request.args.get("period", "24h").lower()
+    if period not in ("1h", "24h", "7d"):
+        period = "24h"
+
+    db_path = getattr(current_app, "db_path", None)
+    data = get_system_analytics(period=period, db_path=db_path)
+    return jsonify(data)
+
+@api_bp.route("/export/excel", methods=["GET"])
+def export_excel_endpoint():
+    """
+    Генерує файл report_YYYY-MM-DD_HH-MM.xlsx із 6 аркушами:
+    - period=1h|24h|7d|all
+    - base64=true: повертає JSON із base64 для нативного діалогу pywebview
+    """
+    period = request.args.get("period", "24h").lower()
+    if period not in ("1h", "24h", "7d", "all"):
+        period = "24h"
+
+    db_path = getattr(current_app, "db_path", None)
+    bio, filename = generate_excel_report(period=period, db_path=db_path)
+
+    if request.args.get("base64", "false").lower() in ("true", "1"):
+        import base64
+        b64_data = base64.b64encode(bio.getvalue()).decode("utf-8")
+        return jsonify({
+            "filename": filename,
+            "data": b64_data,
+            "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        })
+
+    return send_file(
+        bio,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename,
+    )

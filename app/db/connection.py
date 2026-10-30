@@ -70,6 +70,24 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         if col_name not in existing_cols:
             cursor.execute(f"ALTER TABLE metrics ADD COLUMN {col_name} {col_type} DEFAULT NULL")
 
+    # Створення таблиці process_usage_hourly, якщо її ще немає
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS process_usage_hourly (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            hour INTEGER NOT NULL,
+            process_name TEXT NOT NULL,
+            appearances_count INTEGER NOT NULL,
+            avg_cpu_percent REAL NOT NULL,
+            max_cpu_percent REAL NOT NULL,
+            max_memory_percent REAL NOT NULL,
+            first_seen_ts INTEGER NOT NULL,
+            last_seen_ts INTEGER NOT NULL,
+            UNIQUE(hour, process_name) ON CONFLICT REPLACE
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_proc_usage_hourly_hour ON process_usage_hourly(hour)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_proc_usage_hourly_name ON process_usage_hourly(process_name)")
+
     cursor.close()
 
 def init_db(db_path: Optional[Path] = None) -> None:

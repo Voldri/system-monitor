@@ -9,9 +9,11 @@ from pathlib import Path
 
 from app.config import (
     ALERT_CPU_PERCENT,
-    ALERT_RAM_PERCENT,
     ALERT_DISK_FREE_PERCENT,
+    ALERT_GPU_TEMP_C,
+    ALERT_RAM_PERCENT,
     REDZONE_CPU_PERCENT,
+    REDZONE_GPU_TEMP_C,
     REDZONE_RAM_PERCENT,
     load_dotenv,
 )
@@ -46,8 +48,10 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(ALERT_CPU_PERCENT, 90.0)
         self.assertEqual(ALERT_RAM_PERCENT, 85.0)
         self.assertEqual(ALERT_DISK_FREE_PERCENT, 5.0)
+        self.assertEqual(ALERT_GPU_TEMP_C, 85.0)
         self.assertEqual(REDZONE_CPU_PERCENT, ALERT_CPU_PERCENT)
         self.assertEqual(REDZONE_RAM_PERCENT, ALERT_RAM_PERCENT)
+        self.assertEqual(REDZONE_GPU_TEMP_C, ALERT_GPU_TEMP_C)
 
 if __name__ == "__main__":
     unittest.main()

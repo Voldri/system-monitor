@@ -24,6 +24,7 @@ from app.config import (
     METRIC_INTERVAL_SEC,
     PROCESS_INTERVAL_SEC,
 )
+from app.core.alerts import AlertManager
 from app.db.connection import db_session
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,9 @@ class MetricCollector:
             psutil.cpu_percent(interval=None, percpu=True)
         except Exception:
             pass
+
+        # Ініціалізація менеджеру тривог
+        self.alert_manager = AlertManager(db_path=self.db_path)
 
         # Ініціалізація NVML
         self._init_nvml()
@@ -222,6 +226,11 @@ class MetricCollector:
                     self._save_system_metrics(metrics_data)
                     with self._lock:
                         self._history_live.append(metrics_data)
+
+                    # Перевірка порогів тривог (Alerts Engine)
+                    with self._lock:
+                        current_procs = list(self._latest_processes)
+                    self.alert_manager.check_metrics(metrics_data, current_procs)
             except Exception as e:
                 logger.error(f"Помилка в _run_system_loop: {e}", exc_info=True)
 
@@ -563,3 +572,11 @@ class MetricCollector:
             procs.sort(key=lambda x: x["cpu_percent"], reverse=True)
 
         return procs[:limit]
+
+    def get_alerts(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Повертає історію тривог із БД."""
+        return self.alert_manager.get_alerts(limit=limit)
+
+    def get_active_alerts(self) -> List[Dict[str, Any]]:
+        """Повертає активні незакриті тривоги."""
+        return self.alert_manager.get_active_alerts()

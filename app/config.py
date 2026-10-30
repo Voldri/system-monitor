@@ -63,16 +63,20 @@ ALERT_CPU_DURATION_SEC = 30        # Тривалість перевищення
 ALERT_RAM_PERCENT = 85.0           # Поріг RAM %
 ALERT_RAM_DURATION_SEC = 10        # Тривалість перевищення для алерту (секунди)
 ALERT_DISK_FREE_PERCENT = 5.0      # Критичний рівень вільного місця (%)
+ALERT_GPU_TEMP_C = 85.0             # Поріг температури GPU (°C)
+ALERT_GPU_TEMP_DURATION_SEC = 30    # Тривалість перевищення температури GPU (секунди)
 
 # Пороги для розрахунку часу в червоній зоні (використовують ті самі значення)
 REDZONE_CPU_PERCENT = ALERT_CPU_PERCENT
 REDZONE_RAM_PERCENT = ALERT_RAM_PERCENT
+REDZONE_GPU_TEMP_C = ALERT_GPU_TEMP_C
 
 # Політика зберігання даних (Retention)
 RETENTION_RAW_METRICS_HOURS = 2       # 2 години сирих 1-секундних записів
 RETENTION_AGG_METRICS_DAYS = 30       # 30 днів похвилинних агрегатів
 RETENTION_PROC_SNAPSHOTS_HOURS = 24   # 24 години для звичайних знімків процесів
 RETENTION_ALERTS_DAYS = 30            # 30 днів для тривог та їх знімків
+RETENTION_PROCESS_USAGE_HOURLY_DAYS = 30 # 30 днів для погодинного використання програм
 
 # Налаштування Gemini AI Advisor
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")

@@ -19,6 +19,7 @@ from app.config import (
     DB_PATH,
     RETENTION_AGG_METRICS_DAYS,
     RETENTION_ALERTS_DAYS,
+    RETENTION_PROCESS_USAGE_HOURLY_DAYS,
     RETENTION_PROC_SNAPSHOTS_HOURS,
     RETENTION_RAW_METRICS_HOURS,
 )
@@ -61,6 +62,7 @@ class DataAggregator:
         while not self._stop_event.is_set():
             try:
                 self.aggregate_completed_minutes()
+                self.aggregate_process_usage_hourly()
                 self.cleanup_old_data()
             except Exception as e:
                 logger.error(f"Помилка в циклі DataAggregator: {e}", exc_info=True)
@@ -194,6 +196,46 @@ class DataAggregator:
 
         return aggregated_count
 
+    def aggregate_process_usage_hourly(self) -> int:
+        """
+        Агрегує знімки процесів із таблиці process_snapshots у process_usage_hourly:
+        - Групує за годиною ((timestamp / 3600) * 3600) та назвою процесу
+        - Виключає системні службові процеси та PID 0
+        - Рахує кількість появ, середній та максимальний CPU %, максимальний RAM %, першу та останню появу
+        - Зберігає агрегати з унікальним ключем (hour, process_name)
+        """
+        query = """
+        INSERT INTO process_usage_hourly (
+            hour, process_name, appearances_count,
+            avg_cpu_percent, max_cpu_percent, max_memory_percent,
+            first_seen_ts, last_seen_ts
+        )
+        SELECT
+            (timestamp / 3600) * 3600 AS hour_bucket,
+            name,
+            COUNT(*) AS appearances_count,
+            ROUND(AVG(cpu_percent), 2) AS avg_cpu_percent,
+            ROUND(MAX(cpu_percent), 2) AS max_cpu_percent,
+            ROUND(MAX(memory_percent), 2) AS max_memory_percent,
+            MIN(timestamp) AS first_seen_ts,
+            MAX(timestamp) AS last_seen_ts
+        FROM process_snapshots
+        WHERE name != '' AND pid != 0 AND LOWER(name) NOT IN ('system idle process', 'system')
+        GROUP BY hour_bucket, name
+        ON CONFLICT(hour, process_name) DO UPDATE SET
+            appearances_count = excluded.appearances_count,
+            avg_cpu_percent = excluded.avg_cpu_percent,
+            max_cpu_percent = excluded.max_cpu_percent,
+            max_memory_percent = excluded.max_memory_percent,
+            first_seen_ts = MIN(process_usage_hourly.first_seen_ts, excluded.first_seen_ts),
+            last_seen_ts = MAX(process_usage_hourly.last_seen_ts, excluded.last_seen_ts);
+        """
+        with db_session(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(query)
+            affected = cur.rowcount
+        return max(0, affected)
+
     def cleanup_old_data(self) -> dict:
         """
         Видалення застарілих даних за правилами:
@@ -228,5 +270,10 @@ class DataAggregator:
             cur.execute("DELETE FROM alerts WHERE timestamp < ?", (cutoff_alerts,))
             cleaned["alerts"] = cur.rowcount
             cur.execute("DELETE FROM process_snapshots WHERE alert_id IS NOT NULL AND timestamp < ?", (cutoff_alerts,))
+
+            # 5. Видалення старих погодинних підсумків програм старше 30 днів
+            cutoff_proc_usage = now - (RETENTION_PROCESS_USAGE_HOURLY_DAYS * 86400)
+            cur.execute("DELETE FROM process_usage_hourly WHERE hour < ?", (cutoff_proc_usage,))
+            cleaned["proc_usage_hourly"] = cur.rowcount
 
         return cleaned

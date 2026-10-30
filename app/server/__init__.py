@@ -2,6 +2,7 @@
 Ініціалізація Flask додатку для System Monitor.
 """
 
+import logging
 import time
 from pathlib import Path
 from typing import Optional
@@ -10,6 +11,9 @@ from flask import Flask, jsonify, send_from_directory
 
 from app.config import BASE_DIR, DB_PATH
 from app.server.routes import api_bp
+
+# Приглушення службових логів Werkzeug (рівень WARNING)
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 STATIC_DIR = BASE_DIR / "app" / "static"
 

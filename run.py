@@ -29,6 +29,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
 logger = logging.getLogger("run")
 
 class ServerThread(threading.Thread):

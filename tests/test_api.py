@@ -124,5 +124,44 @@ class TestServerAPI(unittest.TestCase):
             for p in procs:
                 self.assertNotEqual(p["pid"], 0)
 
+    def test_system_specs_endpoint(self):
+        """GET /api/system/specs повертає 200 та структуру характеристик ПК."""
+        with self.client.get("/api/system/specs") as res:
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertIn("cpu", data)
+            self.assertIn("ram", data)
+            self.assertIn("disks", data)
+            self.assertIn("gpus", data)
+            self.assertIn("os", data)
+            self.assertIn("system", data)
+
+    def test_alerts_endpoint(self):
+        """GET /api/alerts повертає 200 та список тривог."""
+        with self.client.get("/api/alerts") as res:
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertIn("count", data)
+            self.assertIn("active_count", data)
+            self.assertIn("alerts", data)
+
+    def test_analytics_endpoint(self):
+        """GET /api/analytics повертає 200, індекс стану та зведення."""
+        with self.client.get("/api/analytics?period=24h") as res:
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertIn("health_index", data)
+            self.assertIn("health_status", data)
+            self.assertIn("summary", data)
+            self.assertIn("disk_projections", data)
+
+    def test_metrics_history_hour_downsampled(self):
+        """GET /api/metrics/history?range=hour повертає 200 та 10-секундні усереднені точки."""
+        with self.client.get("/api/metrics/history?range=hour") as res:
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertEqual(data["range"], "hour")
+            self.assertIn("data", data)
+
 if __name__ == "__main__":
     unittest.main()

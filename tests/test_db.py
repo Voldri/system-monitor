@@ -58,6 +58,22 @@ class TestDatabaseAndAggregator(unittest.TestCase):
 
         conn.close()
 
+    def test_process_usage_hourly_table_exists(self):
+        """Перевірка створення таблиці process_usage_hourly при ініціалізації та міграції."""
+        conn = get_db_connection(self.db_path)
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(process_usage_hourly)")
+        cols = {row["name"] for row in cur.fetchall()}
+        self.assertIn("hour", cols)
+        self.assertIn("process_name", cols)
+        self.assertIn("appearances_count", cols)
+        self.assertIn("avg_cpu_percent", cols)
+        self.assertIn("max_cpu_percent", cols)
+        self.assertIn("max_memory_percent", cols)
+        self.assertIn("first_seen_ts", cols)
+        self.assertIn("last_seen_ts", cols)
+        conn.close()
+
     def test_schema_migration_preserves_old_data(self):
         """
         Перевірка міграції схеми:

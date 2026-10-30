@@ -69,3 +69,19 @@ CREATE TABLE IF NOT EXISTS ai_advice (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_advice_timestamp ON ai_advice(timestamp);
+
+CREATE TABLE IF NOT EXISTS process_usage_hourly (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hour INTEGER NOT NULL,
+    process_name TEXT NOT NULL,
+    appearances_count INTEGER NOT NULL,
+    avg_cpu_percent REAL NOT NULL,
+    max_cpu_percent REAL NOT NULL,
+    max_memory_percent REAL NOT NULL,
+    first_seen_ts INTEGER NOT NULL,
+    last_seen_ts INTEGER NOT NULL,
+    UNIQUE(hour, process_name) ON CONFLICT REPLACE
+);
+
+CREATE INDEX IF NOT EXISTS idx_proc_usage_hourly_hour ON process_usage_hourly(hour);
+CREATE INDEX IF NOT EXISTS idx_proc_usage_hourly_name ON process_usage_hourly(process_name);
