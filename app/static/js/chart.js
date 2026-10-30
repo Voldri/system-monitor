@@ -1,9 +1,12 @@
 /**
  * Високопродуктивний легкий Canvas-графік для System Monitor.
  * - Перемальовується ВИКЛЮЧНО при надходженні нових даних або зміні розміру вікна.
+ * - Вісь X пропорційна часу (позиція точки = timestamp).
+ * - Рівномірні підписи часу по всій осі X.
+ * - Три лінії навантаження: CPU (синя #4c8dff), RAM (фіолетова #a78bfa), GPU (помаранчева #f0883e).
+ * - Напівпрозора пунктирна лінія піків CPU (cpu_max) для періодів "Година" та "День".
  * - Розриває лінію, якщо розрив між точками перевищує 2 хвилини (120 с).
- * - Підтримує відображення пікових значень (cpu_max) для періодів "Година" та "День".
- * - Включає інтерактивний tooltip при наведенні курсору.
+ * - Інтерактивний tooltip при наведенні курсору.
  */
 
 class TelemetryChart {
@@ -18,6 +21,9 @@ class TelemetryChart {
     this.hoverIndex = -1;
 
     this.padding = { top: 16, right: 16, bottom: 26, left: 42 };
+
+    this.renderedMinTs = 0;
+    this.renderedMaxTs = 0;
 
     this._initEvents();
   }
@@ -68,7 +74,7 @@ class TelemetryChart {
 
     if (chartW <= 0 || chartH <= 0) return;
 
-    // 1. Малювання горизонтальної сітки та осі Y
+    // 1. Малювання горизонтальної сітки та шкали % Y
     this._drawGrid(ctx, pad, chartW, chartH);
 
     if (this.dataPoints.length === 0) {
@@ -79,7 +85,7 @@ class TelemetryChart {
       return;
     }
 
-    // 2. Розрахунок координат точок
+    // 2. Розрахунок координат точок пропорційно часу
     const points = this._calculateCoordinates(chartW, chartH, pad);
 
     // 3. Малювання піків (cpu_max) для періодів 'hour' та 'day'
@@ -87,14 +93,15 @@ class TelemetryChart {
       this._drawPeakLine(ctx, points);
     }
 
-    // 4. Малювання ліній CPU та RAM з перевіркою розриву часу (> 120 с)
+    // 4. Малювання ліній RAM, GPU та CPU з перевіркою розриву часу (> 120 с)
     this._drawLine(ctx, points, 'ramY', '#a78bfa', 2);
+    this._drawLine(ctx, points, 'gpuY', '#f0883e', 2);
     this._drawLine(ctx, points, 'cpuY', '#4c8dff', 2);
 
-    // 5. Малювання підписів часу на осі X
-    this._drawTimeLabels(ctx, points, pad, chartH);
+    // 5. Рівномірні підписи часу по осі X
+    this._drawTimeLabels(ctx, pad, chartW, chartH);
 
-    // 6. Малювання індикатора hover (якщо курсор над графіком)
+    // 6. Індикатор hover (курсор)
     if (this.hoverIndex >= 0 && this.hoverIndex < points.length) {
       this._drawHoverIndicator(ctx, points[this.hoverIndex], pad, chartH);
     }
@@ -122,13 +129,33 @@ class TelemetryChart {
 
   _calculateCoordinates(chartW, chartH, pad) {
     const len = this.dataPoints.length;
+    if (len === 0) return [];
+
+    let minTs = this.dataPoints[0].timestamp;
+    let maxTs = this.dataPoints[len - 1].timestamp;
+
+    // Масштабування вікна часу під діапазон
+    if (this.currentRange === 'live') {
+      minTs = Math.min(minTs, maxTs - 60);
+    } else if (this.currentRange === 'hour') {
+      minTs = Math.min(minTs, maxTs - 3600);
+    } else if (this.currentRange === 'day') {
+      minTs = Math.min(minTs, maxTs - 86400);
+    }
+
+    const timeSpan = Math.max(1, maxTs - minTs);
+    this.renderedMinTs = minTs;
+    this.renderedMaxTs = maxTs;
+
     const points = [];
 
     for (let i = 0; i < len; i++) {
       const d = this.dataPoints[i];
-      const x = len > 1
-        ? pad.left + (i / (len - 1)) * chartW
-        : pad.left + chartW / 2;
+      const ts = d.timestamp;
+
+      // Позиція X пропорційна timestamp
+      const relTime = Math.max(0, Math.min(1, (ts - minTs) / timeSpan));
+      const x = pad.left + relTime * chartW;
 
       const cpuVal = Math.max(0, Math.min(100, d.cpu_total || 0));
       const cpuMaxVal = Math.max(0, Math.min(100, d.cpu_max !== undefined ? d.cpu_max : cpuVal));
@@ -138,11 +165,18 @@ class TelemetryChart {
       const cpuMaxY = pad.top + chartH - (cpuMaxVal / 100) * chartH;
       const ramY = pad.top + chartH - (ramVal / 100) * chartH;
 
+      let gpuY = null;
+      if (d.gpu_percent !== null && d.gpu_percent !== undefined) {
+        const gpuVal = Math.max(0, Math.min(100, Number(d.gpu_percent)));
+        gpuY = pad.top + chartH - (gpuVal / 100) * chartH;
+      }
+
       points.push({
         x,
         cpuY,
         cpuMaxY,
         ramY,
+        gpuY,
         data: d,
       });
     }
@@ -151,17 +185,21 @@ class TelemetryChart {
   }
 
   _drawLine(ctx, points, yKey, color, lineWidth) {
+    // Відбираємо точки, де є валідне значення Y
+    const validPoints = points.filter((p) => p[yKey] !== null);
+    if (validPoints.length === 0) return;
+
     ctx.lineWidth = lineWidth;
     ctx.strokeStyle = color;
     ctx.beginPath();
 
     let isDrawing = false;
 
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i];
-      const prev = i > 0 ? points[i - 1] : null;
+    for (let i = 0; i < validPoints.length; i++) {
+      const p = validPoints[i];
+      const prev = i > 0 ? validPoints[i - 1] : null;
 
-      // Правило розриву: якщо різниця більше 2 хвилин (120 с) - розриваємо лінію
+      // Розрив лінії, якщо розрив у часі більше 2 хвилин (120 с)
       if (prev && p.data.timestamp - prev.data.timestamp > 120) {
         ctx.stroke();
         ctx.beginPath();
@@ -208,27 +246,40 @@ class TelemetryChart {
     ctx.restore();
   }
 
-  _drawTimeLabels(ctx, points, pad, chartH) {
+  _drawTimeLabels(ctx, pad, chartW, chartH) {
+    if (!this.renderedMinTs || !this.renderedMaxTs) return;
+
     ctx.fillStyle = '#8b949e';
     ctx.font = '11px "Segoe UI Variable", "Segoe UI", sans-serif';
     ctx.textBaseline = 'top';
 
-    const count = points.length;
-    if (count === 0) return;
+    const minTs = this.renderedMinTs;
+    const maxTs = this.renderedMaxTs;
+    const timeSpan = maxTs - minTs;
+    if (timeSpan <= 0) return;
 
-    const labelCount = Math.min(6, count);
-    const step = Math.floor(count / labelCount) || 1;
+    // Рівномірні засічки (6 міток по всій довжині осі X)
+    const tickCount = 6;
+    for (let i = 0; i < tickCount; i++) {
+      const ratio = i / (tickCount - 1);
+      const x = pad.left + ratio * chartW;
+      const t = minTs + ratio * timeSpan;
 
-    for (let i = 0; i < count; i += step) {
-      const p = points[i];
-      const timeStr = p.data.local_time || '';
-      ctx.textAlign = i === 0 ? 'left' : (i + step >= count ? 'right' : 'center');
-      ctx.fillText(timeStr, p.x, pad.top + chartH + 8);
+      const date = new Date(t * 1000);
+      let timeStr;
+      if (this.currentRange === 'day') {
+        timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else {
+        timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+
+      ctx.textAlign = i === 0 ? 'left' : (i === tickCount - 1 ? 'right' : 'center');
+      ctx.fillText(timeStr, x, pad.top + chartH + 8);
     }
   }
 
   _drawHoverIndicator(ctx, point, pad, chartH) {
-    // Вертикальна напрямна лінія
+    // Вертикальна напрямна пунктирна лінія
     ctx.save();
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
@@ -256,6 +307,17 @@ class TelemetryChart {
     ctx.arc(point.x, point.ramY, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+
+    // Точка GPU (якщо є)
+    if (point.gpuY !== null) {
+      ctx.fillStyle = '#f0883e';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(point.x, point.gpuY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
   }
 
   _onMouseMove(e) {
@@ -266,16 +328,18 @@ class TelemetryChart {
 
     const pad = this.padding;
     const chartW = this.width - pad.left - pad.right;
-    const len = this.dataPoints.length;
+    const minTs = this.renderedMinTs;
+    const maxTs = this.renderedMaxTs;
+    const timeSpan = maxTs - minTs;
 
-    // Знаходимо найближчу точку за координатою X
+    // Знаходимо найближчу точку за відстанню до координати X
     let closestIdx = 0;
     let minDiff = Infinity;
 
-    for (let i = 0; i < len; i++) {
-      const x = len > 1
-        ? pad.left + (i / (len - 1)) * chartW
-        : pad.left + chartW / 2;
+    for (let i = 0; i < this.dataPoints.length; i++) {
+      const d = this.dataPoints[i];
+      const relTime = timeSpan > 0 ? (d.timestamp - minTs) / timeSpan : 0.5;
+      const x = pad.left + Math.max(0, Math.min(1, relTime)) * chartW;
       const diff = Math.abs(mouseX - x);
       if (diff < minDiff) {
         minDiff = diff;
@@ -304,11 +368,14 @@ class TelemetryChart {
     const ttCpuPeakRow = document.getElementById('ttCpuPeakRow');
     const ttCpuPeak = document.getElementById('ttCpuPeak');
     const ttRam = document.getElementById('ttRam');
+    const ttGpuRow = document.getElementById('ttGpuRow');
+    const ttGpu = document.getElementById('ttGpu');
 
     if (ttTime) ttTime.textContent = d.local_time || '';
     if (ttCpu) ttCpu.textContent = `${Number(d.cpu_total || 0).toFixed(1)}%`;
     if (ttRam) ttRam.textContent = `${Number(d.ram_percent || 0).toFixed(1)}%`;
 
+    // Пік CPU (тільки для Година/День)
     if (this.currentRange !== 'live' && d.cpu_max !== undefined) {
       if (ttCpuPeakRow) ttCpuPeakRow.style.display = 'flex';
       if (ttCpuPeak) ttCpuPeak.textContent = `${Number(d.cpu_max).toFixed(1)}%`;
@@ -316,9 +383,16 @@ class TelemetryChart {
       if (ttCpuPeakRow) ttCpuPeakRow.style.display = 'none';
     }
 
+    // GPU
+    if (d.gpu_percent !== null && d.gpu_percent !== undefined) {
+      if (ttGpuRow) ttGpuRow.style.display = 'flex';
+      if (ttGpu) ttGpu.textContent = `${Number(d.gpu_percent).toFixed(1)}%`;
+    } else {
+      if (ttGpuRow) ttGpuRow.style.display = 'none';
+    }
+
     this.tooltip.style.display = 'block';
-    // Позиціонування з обмеженням меж
-    const boundedX = Math.max(70, Math.min(this.width - 70, x));
+    const boundedX = Math.max(75, Math.min(this.width - 75, x));
     this.tooltip.style.left = `${boundedX}px`;
     this.tooltip.style.top = `${Math.max(40, y)}px`;
   }

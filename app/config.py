@@ -52,6 +52,10 @@ PORT = int(os.getenv("PORT", "5050"))
 METRIC_INTERVAL_SEC = 1.0
 PROCESS_INTERVAL_SEC = 5.0
 AGGREGATOR_INTERVAL_SEC = 60.0
+GPU_INTERVAL_SEC = 2.0
+
+# Моніторинг дискретної відеокарти NVIDIA (pynvml)
+GPU_MONITORING = os.getenv("GPU_MONITORING", "true").lower() in ("true", "1", "yes")
 
 # Пороги тривог і «червоної зони»
 ALERT_CPU_PERCENT = 90.0           # Поріг CPU %

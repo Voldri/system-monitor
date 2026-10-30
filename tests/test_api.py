@@ -20,9 +20,16 @@ class TestServerAPI(unittest.TestCase):
         init_db(self.db_path)
 
         self.collector = MetricCollector(db_path=self.db_path)
+        self.collector._cpu_warmed_up = True
         # Зберемо один знімок для перевірки
         metrics = self.collector._collect_system_metrics()
-        self.collector._save_system_metrics(metrics)
+        if metrics is None:
+            time.sleep(0.05)
+            metrics = self.collector._collect_system_metrics()
+        if metrics:
+            self.collector._save_system_metrics(metrics)
+            with self.collector._lock:
+                self.collector._history_live.append(metrics)
         procs = self.collector._refresh_processes()
         self.collector._save_process_snapshots(procs)
 
@@ -72,30 +79,39 @@ class TestServerAPI(unittest.TestCase):
             self.assertIn("TabsController", res_tabs.get_data(as_text=True))
 
     def test_status_endpoint(self):
-        """GET /api/status повертає 200, статус ok та логічні ядра."""
+        """GET /api/status повертає 200, статус ok, стан збирача та потоків."""
         with self.client.get("/api/status") as res:
             self.assertEqual(res.status_code, 200)
             data = res.get_json()
             self.assertEqual(data["status"], "ok")
             self.assertIn("logical_cores", data)
             self.assertGreater(data["logical_cores"], 0)
+            self.assertIn("collector_active", data)
+            self.assertIn("threads", data)
+            self.assertIn("metrics", data["threads"])
+            self.assertIn("processes", data["threads"])
+            self.assertIn("gpu", data["threads"])
 
     def test_current_metrics_endpoint(self):
-        """GET /api/metrics/current містить локальний час та показники."""
+        """GET /api/metrics/current містить локальний час, показники CPU, RAM та GPU."""
         with self.client.get("/api/metrics/current") as res:
             self.assertEqual(res.status_code, 200)
             data = res.get_json()
             self.assertIn("cpu_total", data)
             self.assertIn("local_time", data)
             self.assertIn("ram_percent", data)
+            self.assertIn("gpu_percent", data)
 
     def test_history_metrics_endpoint(self):
-        """GET /api/metrics/history повертає часовий ряд."""
+        """GET /api/metrics/history повертає часовий ряд із показниками CPU, RAM та GPU."""
         with self.client.get("/api/metrics/history?range=live") as res:
             self.assertEqual(res.status_code, 200)
             data = res.get_json()
             self.assertEqual(data["range"], "live")
             self.assertGreaterEqual(data["count"], 1)
+            first_point = data["data"][0]
+            self.assertIn("gpu_percent", first_point)
+            self.assertIn("gpu_max", first_point)
 
     def test_processes_endpoint(self):
         """GET /api/processes повертає список процесів без PID 0."""

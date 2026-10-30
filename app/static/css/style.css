@@ -290,6 +290,7 @@ body {
   border: 1px dashed var(--accent-blue);
 }
 .bullet-ram { background-color: var(--accent-purple); }
+.bullet-gpu { background-color: #f0883e; }
 
 /* Вкладки графіка */
 .chart-tabs {
@@ -354,7 +355,7 @@ body {
   transform: translate(-50%, -110%);
   display: none;
   z-index: 100;
-  min-width: 130px;
+  min-width: 140px;
 }
 
 .chart-tooltip .tt-time {
@@ -373,14 +374,14 @@ body {
   margin-top: 3px;
 }
 
-/* 4. Нижня сітка: Ядра процесора та Таблиця процесів */
-.bottom-grid {
+/* 4. Середня сітка: Ядра процесора та Диски (50% / 50%) */
+.middle-grid {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
-/* Блок ядер */
+/* Блок ядер: 2 рівні ряди по 8 колонок (або авто), смужки на всю ширину */
 .cores-card {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
@@ -395,7 +396,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .cores-title {
@@ -411,25 +412,33 @@ body {
 
 .cores-bars-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+  grid-template-columns: repeat(var(--core-cols, 8), 1fr);
+  grid-template-rows: repeat(2, 1fr);
   gap: 8px;
-  align-items: flex-end;
-  min-height: 160px;
-  padding: 10px 0;
+  width: 100%;
+  padding: 6px 0;
+  flex: 1;
+  align-items: stretch;
 }
 
 .core-bar-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  height: 100%;
-  justify-content: flex-end;
+  gap: 4px;
+  width: 100%;
+}
+
+.core-pct-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-feature-settings: "tnum";
 }
 
 .core-bar-track {
-  width: 14px;
-  height: 120px;
+  width: 100%;
+  height: 52px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 4px;
   display: flex;
@@ -450,14 +459,112 @@ body {
   color: var(--text-muted);
 }
 
-.core-pct-label {
+/* Блок дисків (розділи NVMe SSD зі спільною швидкістю) */
+.disks-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+}
+
+.disks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.disks-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.disks-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.disks-type {
   font-size: 10px;
   font-weight: 600;
+  color: var(--accent-blue);
+  background: var(--accent-blue-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(76, 141, 255, 0.3);
+}
+
+.disks-speed {
+  font-size: 12px;
   color: var(--text-secondary);
+  display: flex;
+  gap: 12px;
   font-feature-settings: "tnum";
 }
 
-/* Блок таблиці процесів */
+.disks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+  flex: 1;
+}
+
+.disk-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.disk-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.disk-item-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+}
+
+.disk-item-stats {
+  color: var(--text-secondary);
+  font-feature-settings: "tnum";
+  font-size: 11px;
+}
+
+.disk-item-pct {
+  font-weight: 700;
+  font-feature-settings: "tnum";
+}
+
+.disk-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.disk-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+/* 5. Нижня секція: Топ процесів */
+.processes-section {
+  width: 100%;
+}
+
 .processes-card {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
@@ -583,12 +690,12 @@ body {
   font-size: 13px;
 }
 
-/* Адаптивність під менші вікна */
+/* Адаптивність */
 @media (max-width: 1024px) {
   .tiles-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  .bottom-grid {
+  .middle-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -30,7 +30,25 @@ def get_status():
     system_uptime = int(time.time() - system_boot)
 
     collector = getattr(current_app, "collector", None)
-    collector_alive = bool(collector and collector._thread and collector._thread.is_alive())
+    collector_alive = False
+    threads_status = {
+        "metrics": False,
+        "processes": False,
+        "gpu": False,
+    }
+
+    if collector:
+        if hasattr(collector, "is_running") and callable(collector.is_running):
+            collector_alive = bool(collector.is_running())
+        elif hasattr(collector, "is_running"):
+            collector_alive = bool(collector.is_running)
+        elif hasattr(collector, "_system_thread") and collector._system_thread:
+            collector_alive = bool(collector._system_thread.is_alive())
+
+        if hasattr(collector, "get_threads_status") and callable(collector.get_threads_status):
+            threads_status = collector.get_threads_status()
+        elif hasattr(collector, "threads_status"):
+            threads_status = collector.threads_status
 
     return jsonify({
         "status": "ok",
@@ -38,6 +56,7 @@ def get_status():
         "app_uptime_sec": app_uptime,
         "system_uptime_sec": system_uptime,
         "collector_active": collector_alive,
+        "threads": threads_status,
         "logical_cores": psutil.cpu_count(logical=True) or 1,
     })
 
@@ -73,20 +92,48 @@ def get_current_metrics():
 def get_metrics_history():
     """
     Повертає часовий ряд метрик:
-    - range=live: останні 60 с (посекундні сирі дані)
+    - range=live: останні 60 с (посекундні сирі дані, читаються з пам'яті для 0% навантаження на SQLite)
     - range=hour: останні 60 хв (3600 с)
     - range=day: останні 24 год (похвилинні агрегати)
     """
     range_param = request.args.get("range", "live").lower()
     now = int(time.time())
     db_path = getattr(current_app, "db_path", None)
+    collector = getattr(current_app, "collector", None)
 
+    # 1. Швидкий шлях для live-режиму з пам'яті без звернення до диску
+    if range_param == "live" and collector:
+        live_data = collector.get_live_history(limit=60)
+        if live_data:
+            history = []
+            for r in live_data:
+                history.append({
+                    "timestamp": r["timestamp"],
+                    "local_time": format_local_time_short(r["timestamp"]),
+                    "cpu_total": r["cpu_total"],
+                    "cpu_max": r["cpu_max"],
+                    "ram_percent": r["ram_percent"],
+                    "ram_max": r["ram_max"],
+                    "gpu_percent": r.get("gpu_percent"),
+                    "gpu_max": r.get("gpu_max"),
+                    "disk_read_bytes_sec": r["disk_read_bytes_sec"],
+                    "disk_write_bytes_sec": r["disk_write_bytes_sec"],
+                    "net_sent_bytes_sec": r["net_sent_bytes_sec"],
+                    "net_recv_bytes_sec": r["net_recv_bytes_sec"],
+                    "is_aggregated": r.get("is_aggregated", 0),
+                })
+            return jsonify({
+                "range": "live",
+                "count": len(history),
+                "data": history,
+            })
+
+    # 2. Читання з SQLite для тривалих періодів або фолбеку
     if range_param == "day":
         cutoff = now - 86400
-        # Для добового графіку беремо похвилинні агрегати (is_aggregated = 1),
-        # або сирі дані, якщо агрегатів за цей час ще немає
         query = """
         SELECT timestamp, cpu_total, cpu_max, ram_percent, ram_max,
+               gpu_percent, gpu_max,
                disk_read_bytes_sec, disk_write_bytes_sec, net_sent_bytes_sec, net_recv_bytes_sec,
                is_aggregated
         FROM metrics
@@ -98,6 +145,7 @@ def get_metrics_history():
         cutoff = now - 3600
         query = """
         SELECT timestamp, cpu_total, cpu_max, ram_percent, ram_max,
+               gpu_percent, gpu_max,
                disk_read_bytes_sec, disk_write_bytes_sec, net_sent_bytes_sec, net_recv_bytes_sec,
                is_aggregated
         FROM metrics
@@ -105,10 +153,11 @@ def get_metrics_history():
         ORDER BY timestamp ASC
         """
         params = (cutoff,)
-    else:  # live (за замовчуванням 60 секунд)
+    else:  # live фолбек з бази
         cutoff = now - 60
         query = """
         SELECT timestamp, cpu_total, cpu_max, ram_percent, ram_max,
+               gpu_percent, gpu_max,
                disk_read_bytes_sec, disk_write_bytes_sec, net_sent_bytes_sec, net_recv_bytes_sec,
                is_aggregated
         FROM metrics
@@ -131,6 +180,8 @@ def get_metrics_history():
             "cpu_max": r["cpu_max"],
             "ram_percent": r["ram_percent"],
             "ram_max": r["ram_max"],
+            "gpu_percent": r["gpu_percent"],
+            "gpu_max": r["gpu_max"],
             "disk_read_bytes_sec": r["disk_read_bytes_sec"],
             "disk_write_bytes_sec": r["disk_write_bytes_sec"],
             "net_sent_bytes_sec": r["net_sent_bytes_sec"],

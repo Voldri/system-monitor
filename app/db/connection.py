@@ -49,9 +49,32 @@ def db_session(db_path: Optional[Path] = None) -> Generator[sqlite3.Connection, 
     finally:
         conn.close()
 
+def migrate_db(conn: sqlite3.Connection) -> None:
+    """
+    Виконує автоматичну міграцію схеми: додає нові колонки до існуючих таблиць,
+    якщо вони відсутні, зберігаючи всі накопичені раніше дані.
+    """
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(metrics)")
+    existing_cols = {row["name"] for row in cursor.fetchall()}
+
+    new_metrics_columns = [
+        ("gpu_percent", "REAL"),
+        ("gpu_max", "REAL"),
+        ("gpu_mem_used_bytes", "INTEGER"),
+        ("gpu_mem_total_bytes", "INTEGER"),
+        ("gpu_temp_c", "REAL"),
+    ]
+
+    for col_name, col_type in new_metrics_columns:
+        if col_name not in existing_cols:
+            cursor.execute(f"ALTER TABLE metrics ADD COLUMN {col_name} {col_type} DEFAULT NULL")
+
+    cursor.close()
+
 def init_db(db_path: Optional[Path] = None) -> None:
     """
-    Ініціалізує таблиці та індекси з файлу schema.sql.
+    Ініціалізує таблиці та індекси з файлу schema.sql та виконує міграцію схеми.
     """
     path = db_path or DB_PATH
     with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
@@ -59,3 +82,4 @@ def init_db(db_path: Optional[Path] = None) -> None:
 
     with db_session(path) as conn:
         conn.executescript(schema_sql)
+        migrate_db(conn)

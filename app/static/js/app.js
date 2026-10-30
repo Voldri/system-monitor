@@ -1,9 +1,10 @@
 /**
  * Головний контролер веб-дашборду System Monitor.
- * - Опитування поточних метрик: раз на 1 с
+ * - Опитування поточних метрик: раз на 1 с (плитки, смужки ядер, диски)
+ * - Графік "Наживо": раз на 1 с (зчитується з in-memory буфера)
  * - Опитування процесів: раз на 5 с
- * - Опитування графіка: 1 с для "Наживо", 60 с для "Година / День"
- * - Локальний час та україномовні одиниці вимірювання
+ * - Графіки "Година" / "День": при кліку та раз на 60 с
+ * - Підтримка GPU (NVIDIA RTX), розділів NVMe SSD зі спільною швидкістю I/O.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,12 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const sparkBuffers = {
     cpu: [],
     ram: [],
-    disk: [],
+    gpu: [],
     net: [],
   };
 
   const tabsController = new TabsController((newRange) => {
-    // При перемиканні вкладок негайно завантажуємо історію за обраний період
     fetchChartHistory(newRange);
   });
 
@@ -122,28 +122,35 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       pushSparkline('ram', ramVal, 100, '#a78bfa');
 
-      // Плитка Диск C:
-      let cDrive = null;
-      if (Array.isArray(data.disks_info)) {
-        cDrive = data.disks_info.find((d) => d.mount && d.mount.toUpperCase().startsWith('C:')) || data.disks_info[0];
-      }
-      if (cDrive) {
-        const diskPct = Number(cDrive.percent || 0);
-        const diskValElem = document.getElementById('diskPercentVal');
-        const diskCaption = document.getElementById('diskFreeCaption');
-        const diskTotalInfo = document.getElementById('diskTotalInfo');
+      // Плитка GPU (Відеокарта)
+      const gpuValElem = document.getElementById('gpuPercentVal');
+      const gpuCaption = document.getElementById('gpuCaption');
+      const gpuNameInfo = document.getElementById('gpuNameInfo');
 
-        if (diskValElem) {
-          diskValElem.textContent = `${diskPct.toFixed(1)}%`;
-          applyValueState(diskValElem, diskPct);
+      if (data.gpu_percent !== null && data.gpu_percent !== undefined) {
+        const gpuPct = Number(data.gpu_percent);
+        if (gpuValElem) {
+          gpuValElem.textContent = `${gpuPct.toFixed(1)}%`;
+          applyValueState(gpuValElem, gpuPct);
         }
-        if (diskCaption) {
-          diskCaption.textContent = `Вільно: ${formatBytesGB(cDrive.free_bytes)}`;
+        if (gpuNameInfo && data.gpu_name) {
+          gpuNameInfo.textContent = data.gpu_name;
         }
-        if (diskTotalInfo) {
-          diskTotalInfo.textContent = formatBytesGB(cDrive.total_bytes);
+        const vramUsed = formatBytesGB(data.gpu_mem_used_bytes);
+        const vramTotal = formatBytesGB(data.gpu_mem_total_bytes);
+        const tempStr = data.gpu_temp_c !== null ? `${Math.round(data.gpu_temp_c)}°C` : '--°C';
+        if (gpuCaption) {
+          gpuCaption.textContent = `${vramUsed} / ${vramTotal} • ${tempStr}`;
         }
-        pushSparkline('disk', diskPct, 100, '#3fb950');
+        pushSparkline('gpu', gpuPct, 100, '#f0883e');
+      } else {
+        if (gpuValElem) {
+          gpuValElem.textContent = 'Недоступно';
+          gpuValElem.className = 'tile-value';
+        }
+        if (gpuCaption) {
+          gpuCaption.textContent = 'GPU не виявлено або вимкнено';
+        }
       }
 
       // Плитка Мережа
@@ -158,8 +165,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const totalNetSpeed = (netRecv + netSent) / 1024; // в КБ/с
       pushSparkline('net', totalNetSpeed, Math.max(500, totalNetSpeed * 1.5), '#4c8dff');
 
-      // Оновлення смужок ядер процесора
+      // Оновлення смужок ядер процесора (сітка 2x8)
       updateCoresBars(data.cpu_cores);
+
+      // Оновлення картки дисків
+      updateDisksCard(data);
 
     } catch (e) {
       console.warn('Помилка оновлення поточних метрик:', e);
@@ -168,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function pushSparkline(key, value, maxVal, color) {
     const buf = sparkBuffers[key];
+    if (!buf) return;
     buf.push(value);
     if (buf.length > 60) buf.shift();
 
@@ -175,15 +186,18 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSparkline(canvasId, buf, color, maxVal);
   }
 
-  // 5. Оновлення вертикальних смужок ядер процесора
+  // 5. Оновлення смужок ядер процесора (рівна сітка 2 ряди по 8 колонок)
   function updateCoresBars(coresArray) {
     const container = document.getElementById('coresGrid');
     if (!container || !Array.isArray(coresArray)) return;
 
+    const numCores = coresArray.length;
+    const cols = Math.ceil(numCores / 2) || 8;
+    container.style.setProperty('--core-cols', cols);
+
     let existingWrappers = container.querySelectorAll('.core-bar-wrapper');
 
-    // Якщо кількість ядер змінилась або блок ще не створено
-    if (existingWrappers.length !== coresArray.length) {
+    if (existingWrappers.length !== numCores) {
       container.innerHTML = '';
       coresArray.forEach((_, idx) => {
         const wrap = document.createElement('div');
@@ -221,7 +235,59 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 6. Оновлення даних графіка
+  // 6. Оновлення картки дисків (спільна швидкість NVMe та всі локальні розділи)
+  function updateDisksCard(data) {
+    // Спільна швидкість
+    const readElem = document.getElementById('diskSharedRead');
+    const writeElem = document.getElementById('diskSharedWrite');
+    if (readElem) readElem.textContent = `↓ ${formatSpeed(data.disk_read_bytes_sec || 0)}`;
+    if (writeElem) writeElem.textContent = `↑ ${formatSpeed(data.disk_write_bytes_sec || 0)}`;
+
+    const listContainer = document.getElementById('disksList');
+    if (!listContainer || !Array.isArray(data.disks_info)) return;
+
+    if (data.disks_info.length === 0) {
+      listContainer.innerHTML = '<div class="empty-state">Розділів не знайдено</div>';
+      return;
+    }
+
+    listContainer.innerHTML = data.disks_info.map((d) => {
+      const pct = Math.max(0, Math.min(100, Number(d.percent || 0)));
+      const mount = (d.mount || 'Диск').replace(/\\+$/, '');
+      const usedGb = formatBytesGB(d.used_bytes);
+      const freeGb = formatBytesGB(d.free_bytes);
+      const totalGb = formatBytesGB(d.total_bytes);
+
+      let colorVar = 'var(--status-green)';
+      let colorClass = 'val-green';
+      if (pct > 90) {
+        colorVar = 'var(--status-red)';
+        colorClass = 'val-red';
+      } else if (pct >= 70) {
+        colorVar = 'var(--status-yellow)';
+        colorClass = 'val-yellow';
+      }
+
+      return `
+        <div class="disk-item">
+          <div class="disk-item-header">
+            <span class="disk-item-name">
+              <span>Локальний диск (${escapeHtml(mount)})</span>
+            </span>
+            <span class="disk-item-stats">
+              Використано: ${usedGb} • Вільно: ${freeGb} • Всього: ${totalGb}
+            </span>
+            <span class="disk-item-pct ${colorClass}">${pct.toFixed(1)}%</span>
+          </div>
+          <div class="disk-bar-track">
+            <div class="disk-bar-fill" style="width: ${pct}%; background-color: ${colorVar};"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 7. Оновлення даних графіка
   async function fetchChartHistory(range) {
     try {
       const res = await fetch(`/api/metrics/history?range=${range}`);
@@ -233,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 7. Оновлення списку процесів (раз на 5 с)
+  // 8. Оновлення списку процесів (раз на 5 с)
   async function fetchProcesses() {
     try {
       const res = await fetch(`/api/processes?sort=${currentSort}&limit=12`);
@@ -322,14 +388,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 8. Таймери та періодичні інтервали
+  // 9. Таймери та періодичні інтервали
   // Первинне завантаження
   fetchStatus();
   fetchCurrentMetrics();
   fetchChartHistory('live');
   fetchProcesses();
 
-  // Опитування раз на 1 секунду: плитки поточних показників + графік "Наживо"
+  // Опитування раз на 1 секунду: плитки + графік "Наживо"
   setInterval(() => {
     fetchCurrentMetrics();
     if (tabsController.getCurrentTab() === 'live') {
@@ -342,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchProcesses();
   }, 5000);
 
-  // Опитування раз на 60 секунд: історія для вкладок "Година" або "День" + статус
+  // Опитування раз на 60 секунд: статус + історія "Година/День"
   setInterval(() => {
     fetchStatus();
     const currentTab = tabsController.getCurrentTab();

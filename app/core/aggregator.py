@@ -52,6 +52,10 @@ class DataAggregator:
             self._thread.join(timeout=timeout)
         logger.info("DataAggregator зупинено.")
 
+    def is_running(self) -> bool:
+        """Перевіряє, чи активний фоновий потік агрегатора."""
+        return bool(self._thread and self._thread.is_alive())
+
     def _run_loop(self) -> None:
         """Головний цикл агрегації та ротації (кожні 60 с)."""
         while not self._stop_event.is_set():
@@ -98,7 +102,8 @@ class DataAggregator:
                     SELECT cpu_total, cpu_max, cpu_cores, ram_used_bytes, ram_total_bytes,
                            ram_percent, ram_max, swap_used_bytes, swap_total_bytes,
                            disk_read_bytes_sec, disk_write_bytes_sec,
-                           net_sent_bytes_sec, net_recv_bytes_sec, disks_info
+                           net_sent_bytes_sec, net_recv_bytes_sec, disks_info,
+                           gpu_percent, gpu_max, gpu_mem_used_bytes, gpu_mem_total_bytes, gpu_temp_c
                     FROM metrics
                     WHERE is_aggregated = 0 AND timestamp >= ? AND timestamp < ?
                 """, (minute_bucket, minute_end))
@@ -124,6 +129,21 @@ class DataAggregator:
                 net_sent_avg = sum(r["net_sent_bytes_sec"] for r in rows) / count
                 net_recv_avg = sum(r["net_recv_bytes_sec"] for r in rows) / count
 
+                # Розрахунок показників GPU (якщо є)
+                gpu_vals = [r["gpu_percent"] for r in rows if r["gpu_percent"] is not None]
+                gpu_max_vals = [r["gpu_max"] for r in rows if r["gpu_max"] is not None]
+                gpu_avg = round(sum(gpu_vals) / len(gpu_vals), 2) if gpu_vals else None
+                gpu_max_val = round(max(gpu_max_vals), 2) if gpu_max_vals else None
+
+                gpu_mem_used_vals = [r["gpu_mem_used_bytes"] for r in rows if r["gpu_mem_used_bytes"] is not None]
+                gpu_mem_used_avg = int(sum(gpu_mem_used_vals) / len(gpu_mem_used_vals)) if gpu_mem_used_vals else None
+
+                gpu_mem_totals = [r["gpu_mem_total_bytes"] for r in rows if r["gpu_mem_total_bytes"] is not None]
+                gpu_mem_total_val = gpu_mem_totals[-1] if gpu_mem_totals else None
+
+                gpu_temps = [r["gpu_temp_c"] for r in rows if r["gpu_temp_c"] is not None]
+                gpu_temp_avg = round(sum(gpu_temps) / len(gpu_temps), 1) if gpu_temps else None
+
                 # Розрахунок середнього завантаження ядер
                 all_cores_lists = [json.loads(r["cpu_cores"]) for r in rows if r["cpu_cores"]]
                 if all_cores_lists:
@@ -144,8 +164,9 @@ class DataAggregator:
                         timestamp, cpu_total, cpu_max, cpu_cores, ram_used_bytes, ram_total_bytes,
                         ram_percent, ram_max, swap_used_bytes, swap_total_bytes,
                         disk_read_bytes_sec, disk_write_bytes_sec, net_sent_bytes_sec,
-                        net_recv_bytes_sec, disks_info, is_aggregated
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                        net_recv_bytes_sec, disks_info, is_aggregated,
+                        gpu_percent, gpu_max, gpu_mem_used_bytes, gpu_mem_total_bytes, gpu_temp_c
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
                 """, (
                     minute_bucket,
                     round(cpu_avg, 2),
@@ -162,6 +183,11 @@ class DataAggregator:
                     round(net_sent_avg, 2),
                     round(net_recv_avg, 2),
                     last_disks_info,
+                    gpu_avg,
+                    gpu_max_val,
+                    gpu_mem_used_avg,
+                    gpu_mem_total_val,
+                    gpu_temp_avg,
                 ))
 
                 aggregated_count += 1

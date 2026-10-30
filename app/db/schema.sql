@@ -17,7 +17,12 @@ CREATE TABLE IF NOT EXISTS metrics (
     net_sent_bytes_sec REAL NOT NULL,
     net_recv_bytes_sec REAL NOT NULL,
     disks_info TEXT NOT NULL,
-    is_aggregated INTEGER DEFAULT 0
+    is_aggregated INTEGER DEFAULT 0,
+    gpu_percent REAL DEFAULT NULL,
+    gpu_max REAL DEFAULT NULL,
+    gpu_mem_used_bytes INTEGER DEFAULT NULL,
+    gpu_mem_total_bytes INTEGER DEFAULT NULL,
+    gpu_temp_c REAL DEFAULT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_metrics_ts_agg ON metrics(timestamp, is_aggregated);

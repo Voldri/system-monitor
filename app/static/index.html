@@ -23,7 +23,7 @@
       </div>
     </header>
 
-    <!-- 2. Ряд із 4 плиток поточних показників -->
+    <!-- 2. Ряд із 4 плиток: CPU, RAM, GPU, Мережа -->
     <section class="tiles-grid">
       <!-- Плитка 1: CPU -->
       <div class="tile-card" id="tileCpu">
@@ -59,19 +59,19 @@
         </div>
       </div>
 
-      <!-- Плитка 3: Диск C: -->
-      <div class="tile-card" id="tileDisk">
+      <!-- Плитка 3: GPU (Відеокарта) -->
+      <div class="tile-card" id="tileGpu">
         <div class="tile-header">
-          <span class="tile-title">Системний диск C:</span>
-          <span class="tile-subinfo" id="diskTotalInfo">-- ГБ</span>
+          <span class="tile-title">Відеокарта</span>
+          <span class="tile-subinfo" id="gpuNameInfo">NVIDIA GPU</span>
         </div>
         <div class="tile-body">
           <div class="tile-value-group">
-            <span class="tile-value" id="diskPercentVal">--%</span>
-            <span class="tile-caption" id="diskFreeCaption">Вільно: -- ГБ</span>
+            <span class="tile-value" id="gpuPercentVal">--%</span>
+            <span class="tile-caption" id="gpuCaption">VRAM: -- / -- • --°C</span>
           </div>
           <div class="tile-sparkline-wrap">
-            <canvas id="sparklineDisk" class="sparkline-canvas"></canvas>
+            <canvas id="sparklineGpu" class="sparkline-canvas"></canvas>
           </div>
         </div>
       </div>
@@ -94,7 +94,7 @@
       </div>
     </section>
 
-    <!-- 3. Великий графік навантаження CPU та RAM -->
+    <!-- 3. Великий графік навантаження CPU, RAM та GPU -->
     <section class="chart-section">
       <div class="chart-header">
         <div class="chart-title-group">
@@ -111,6 +111,10 @@
             <div class="legend-item">
               <span class="legend-bullet bullet-ram"></span>
               <span>RAM</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-bullet bullet-gpu"></span>
+              <span>GPU</span>
             </div>
           </div>
         </div>
@@ -139,13 +143,17 @@
             <span style="color: var(--accent-purple);">RAM:</span>
             <strong id="ttRam">--%</strong>
           </div>
+          <div class="tt-row" id="ttGpuRow" style="display: none;">
+            <span style="color: #f0883e;">GPU:</span>
+            <strong id="ttGpu">--%</strong>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- 4. Нижня сітка: Ядра процесора та Топ процесів -->
-    <section class="bottom-grid">
-      <!-- Ядра процесора -->
+    <!-- 4. Середня сітка: Ядра процесора та Диски -->
+    <section class="middle-grid">
+      <!-- Картка: Ядра процесора -->
       <div class="cores-card">
         <div class="cores-header">
           <h3 class="cores-title">Ядра процесора</h3>
@@ -156,7 +164,26 @@
         </div>
       </div>
 
-      <!-- Таблиця процесів -->
+      <!-- Картка: Диски (всі розділи NVMe SSD зі спільною швидкістю) -->
+      <div class="disks-card">
+        <div class="disks-header">
+          <div class="disks-header-left">
+            <h3 class="disks-title">Диски</h3>
+            <span class="disks-type">NVMe SSD</span>
+          </div>
+          <div class="disks-speed" id="disksSharedSpeed">
+            <span id="diskSharedRead">↓ 0 КБ/с</span>
+            <span id="diskSharedWrite">↑ 0 КБ/с</span>
+          </div>
+        </div>
+        <div class="disks-list" id="disksList">
+          <div class="empty-state">Завантаження розділів...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Нижня секція: Топ процесів -->
+    <section class="processes-section">
       <div class="processes-card">
         <div class="processes-header">
           <h3 class="processes-title">Топ процесів</h3>
